@@ -6,7 +6,9 @@ WITH
     StatObject AS StatObjects,
     SeasonCodes,
     Question2Objects,
-    startSlot
+    startSlot,
+    Value1Template,
+    Value2Template
   FROM
     `{InsightsConfigurationTable}`
   WHERE
@@ -15,13 +17,15 @@ WITH
     ),
   insightStats AS (
   SELECT
-    DENSE_RANK() OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, MatchStageCode, QuestionCode ORDER BY StatValue DESC) AS internalDenseRank,
-    COUNT(*) OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, MatchStageCode, QuestionCode) AS objectsCount,
-    MIN(StatValue) OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, MatchStageCode, QuestionCode) AS minValue,
-    MAX(StatValue) OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, MatchStageCode, QuestionCode) AS maxValue,
+    DENSE_RANK() OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, GamePeriodCode, QuestionCode ORDER BY StatValue DESC) AS internalDenseRank,
+    RANK() OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, GamePeriodCode, QuestionCode ORDER BY StatValue DESC) AS internalRank,
+    COUNT(*) OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, GamePeriodCode, QuestionCode) AS objectsCount,
+    MIN(StatValue) OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, GamePeriodCode, QuestionCode) AS minValue,
+    MAX(StatValue) OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, GamePeriodCode, QuestionCode) AS maxValue,
     CASE
       WHEN StatObject='team' THEN TeamName
       WHEN StatObject='player' THEN FORMAT("%s (%s)", PlayerName, TeamName)
+      WHEN SportCode='Entertainmant' THEN PlayerName
     END
     AS StatObjectName,
     insightsConfiguration.*,
@@ -42,16 +46,18 @@ WITH
     AND STRPOS(SeasonCodes, SeasonCode) > 0 ),
   insightStats_valrange AS (
   SELECT
-    COUNT(*) OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, MatchStageCode, QuestionCode, internalDenseRank) AS rankItemsCount,
+    COUNT(*) OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, GamePeriodCode, QuestionCode, internalDenseRank) AS rankItemsCount,
     ABS(maxValue-minValue) AS valueRange,
     *
   FROM
     insightStats
   WHERE
-    maxValue-minValue>0 ),
+    maxValue-minValue>0
+    AND internalRank < {MaxItems}
+    ),
   insightStats_numranks AS (
   SELECT
-    MAX(internalDenseRank) OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, MatchStageCode, QuestionCode) AS numRanks,
+    MAX(internalDenseRank) OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, GamePeriodCode, QuestionCode) AS numRanks,
     *
   FROM
     insightStats_valrange),

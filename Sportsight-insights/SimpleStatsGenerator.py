@@ -20,16 +20,21 @@ targetTableFormat = 'Stat_{SportCode}_{StatSource}_{StatName}_{StatObject}_{Stat
 class SimpleStatsGenerator():
     #
     # read in the configurations
-    def __init__(self):
+    def __init__(self, root):
         #
-        # get the initial configuration 
+        # get the initial configuration
+        self.root = root
         self.configsheet_url = 'https://docs.google.com/spreadsheets/d/1gwtQlzk0iA4qyLzqaYEk5SggOqNZtJnSSfwnZYDNlAw/export?format=csv&gid={SheetId}&run=1'
-        statsconfig_df = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,'284194018')).fillna('')
-        self.sourcesConfigDict = pu.ProUtils.pandas_df_to_dict(statsconfig_df, 'Configname')
-        self.statsDefDict = {}
+        sourceConfigDF = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,'284194018')).fillna('')
+        sourceConfigDF['enriched'] = False
+        self.sourcesConfigDict = pu.ProUtils.pandas_df_to_dict(sourceConfigDF, 'Configname')
         self.sport_configs = {}
-        for sourceConfig in self.sourcesConfigDict.values():
-            self.get_source_configuration(sourceConfig['Configname'])
+
+        #
+        # read IMDB title definitions
+        titleTypesDF = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,'1802180540')).fillna('')
+        self.titletypesConfigDict = pu.ProUtils.pandas_df_to_dict(titleTypesDF, 'TitleType')
+
         #print(sourceConfig)
 
         self.consumerStatus = multiprocessing.Queue()
@@ -38,16 +43,22 @@ class SimpleStatsGenerator():
 
     def get_source_configuration(self, configName):
         sourceConfig = self.sourcesConfigDict[configName]
+        if sourceConfig['DoIT']!='y' or sourceConfig['enriched']==True:
+            return sourceConfig
+
         sheetId = sourceConfig['SportSheetId']
         #
         # read all relevant metrics
         if sheetId not in self.sport_configs.keys():
             self.sport_configs[sheetId] = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,str(sourceConfig['SportSheetId']))).fillna('')
             self.sport_configs[sheetId]['SportCode'] = sourceConfig['SportCode']
-            self.statsDefDict.update(pu.ProUtils.pandas_df_to_dict(self.sport_configs[sheetId], 'StatName'))
-        if 'query' not in sourceConfig.keys():
-            sourceConfig['query'] = open('./Queries/' + sourceConfig['QueryFile'], 'r').read()
 
+        sourceConfig['StatsDefDict'] = pu.ProUtils.pandas_df_to_dict(self.sport_configs[sheetId], 'StatName')
+
+        if 'query' not in sourceConfig.keys():
+            sourceConfig['query'] = open(self.root + '/Queries/' + sourceConfig['QueryFile'], 'r').read()
+
+        sourceConfig['enriched'] = True
         self.sourcesConfigDict[configName] = sourceConfig
         return sourceConfig
 
@@ -79,68 +90,186 @@ class SimpleStatsGenerator():
                                                                                        flush=True)
         print('Consumer {} terminates, Deltatime: {}'.format(str(i), dt.now() - startTime), flush=True)
 
-    def queriesGenerator(self, queriesQueue, numExecutors, all = False, sports = [], sources=[], stats=[]):
-
+    def queriesGenerator(self, queriesQueue, numExecutors, configurations=[]):
         startTime = dt.now()
         #
         # Make sure the target dataset exists
         self.bqUtils.create_dataset(targetDataset)
         #
-        # create jobs for all relevant metrics.
-        for statDef in self.statsDefDict.values():
-            if all or statDef['SportCode'] in sports or statDef['StatSource'] in sources or statDef['StatName'] in stats:
-                sourceConfig = self.get_source_configuration('{}.{}'.format(statDef['SportCode'], statDef['StatSource']))
-                sourceDefinitions = definitions[sourceConfig['Configname']]
-
-                print('Metric: {}, Sport:{}, Delta time: {}'.format(statDef['StatName'],
-                                                                    statDef['SportCode'],
-                                                                    dt.now() - startTime),
-                      flush=True)
-
-                for statObject in statDef['StatObject'].split(','):
-                    for statTimeframe in sourceConfig['StatTimeframe'].split(','):
-                        query = sourceConfig['query']
-                        query = query.replace('{StatObject}', statObject)
-                        query = query.replace('{StatTimeframe}', statTimeframe)
-                        query=pu.ProUtils.format_string(query, sourceDefinitions['StatObject'][statObject])
-                        #query=pu.ProUtils.format_string(query, sourceDefinitions['StatTimeframe'][statTimeframe])
-                        query=pu.ProUtils.format_string(query, statDef)
-                        query=pu.ProUtils.format_string(query, sourceConfig)
-                        #print (query)
-                        #
-                        # define the destination table
-                        instructions = statDef
-                        instructions['StatObject'] = statObject
-                        instructions['StatTimeframe'] = statTimeframe
-                        targetTable = pu.ProUtils.format_string(targetTableFormat, instructions).replace('.', '_')
-                        jobDefinition = {
-                            'params': {
-                                'query': query,
-                                'targetDataset': targetDataset,
-                                'targetTable': targetTable,
-                            },
-                            'StatName': statDef['StatName'],
-                            'StatObject': statObject,
-                            'StatTimeframe': statTimeframe
-                        }
-                        queriesQueue.put(jobDefinition)
+        # loop over all configurations and generate
+        for sourceConfigName in self.sourcesConfigDict.keys():
+            #
+            # if there are only partial list of configurations
+            if (len(configurations)>0) and (sourceConfigName not in configurations):
+                continue
+            #
+            # get the source configuration
+            sourceConfig = self.get_source_configuration(sourceConfigName)
+            #
+            # make sure it is required.
+            if sourceConfig['DoIT']!='y':
+                continue
+            #
+            # call the relevant generation function.
+            generatorFunc = eval('self.{}'.format(sourceConfig['generatorFunc']))
+            generatorFunc(queriesQueue, sourceConfig, startTime)
+        #
+        # Set the sentinel for all processes.
         for i in range(numExecutors):
             queriesQueue.put(self.sentinel)  # indicate sentinel
 
-    def run(self, all=False, sports=[], sources=[], stats=[]):
+    def imdbQueriesGenerator(self, queriesQueue, sourceConfig, startTime):
+
+        #
+        # create jobs for all relevant metrics.
+        for statDef in sourceConfig['StatsDefDict'].values():
+
+            if statDef['Doit']!='y':
+                continue
+
+            print('Metric: {}, Sport:{}, Delta time: {}'.format(statDef['StatName'],
+                                                                statDef['SportCode'],
+                                                                dt.now() - startTime),
+                  flush=True)
+
+            for titleType in statDef['TitleType'].split(','):
+                titletypeConfig = self.titletypesConfigDict[titleType]
+                if statDef['Genres']=='y':
+                    genresList = titletypeConfig['GenresList'].split(',')
+                else:
+                    genresList = ['All']
+
+                for genre in genresList:
+                    _statDef = statDef.copy()
+                    query = sourceConfig['query']
+                    if genre=='All':
+                        _statDef['StatCondition'] = ''
+                    else:
+                        _statDef['StatCondition'] = 'AND STRPOS(Genres, "{}")>0'.format(genre)
+                        _statDef['StatName'] = '{}.{}'.format(statDef['StatName'], genre)
+                    _statDef['TitleType'] = titleType
+                    _statDef['Genre'] = genre
+                    _statDef['StatObject'] = titleType
+                    query=pu.ProUtils.format_string(query, _statDef)
+                    query=pu.ProUtils.format_string(query, sourceConfig)
+                    query=pu.ProUtils.format_string(query, titletypeConfig)
+                    #print (query)
+                    #a=b
+                    #
+                    # define the destination table
+                    instructions = _statDef
+                    instructions['StatTimeframe'] = sourceConfig['StatTimeframe']
+                    targetTable = pu.ProUtils.format_string(targetTableFormat, instructions).replace('.', '_').replace('-', '_')
+                    jobDefinition = {
+                        'params': {
+                            'query': query,
+                            'targetDataset': targetDataset,
+                            'targetTable': targetTable,
+                        },
+                        'StatName': _statDef['StatName'],
+                        'StatObject': sourceConfig['StatObject'],
+                        'StatTimeframe': sourceConfig['StatTimeframe']
+                    }
+                    queriesQueue.put(jobDefinition)
+
+    def imdbQuestionsDefGenerator(self):
+        #
+        # create jobs for all relevant metrics.
+        questionsList=[]
+        sourceConfig = self.get_source_configuration('Entertainmant.IMDB')
+
+        for statDef in sourceConfig['StatsDefDict'].values():
+
+            for titleType in statDef['TitleType'].split(','):
+                titletypeConfig = self.titletypesConfigDict[titleType]
+                if statDef['Genres']=='y':
+                    genresList = titletypeConfig['GenresList'].split(',')
+                else:
+                    genresList = ['All']
+
+                for genre in genresList:
+                    questionDef = {}
+                    questionDef['QuestionCode'] = '{}.{}'.format(titleType, statDef['StatName'])
+                    questionDef['StatName'] = statDef['StatName']
+                    questionDef['StatObject'] = titleType
+                    questionDef['Genre'] = ''
+                    questionDef['TitleType'] = titleType
+                    questionDef['Level'] = 'Easy'
+                    questionDef['Value1Template'] = statDef['Value1Template']
+                    questionDef['Value2Template'] = statDef['Value2Template']
+                    questionDef['ObjectDisplayName'] = titletypeConfig['ObjectDisplayName']
+
+                    questionDef['QuestionNObjects'] = ''
+                    if genre!='All':
+                        questionDef['QuestionCode'] = '{}.{}'.format(questionDef['QuestionCode'], genre)
+                        questionDef['StatName'] = '{}.{}'.format(questionDef['StatName'], genre)
+                        questionDef['Genre'] = genre+' '
+
+                    questionDef['Question2Objects'] = pu.ProUtils.format_string(statDef['Question2Objects'], questionDef)
+                    questionsList.append(questionDef)
+
+        keys = ['QuestionCode', 'StatName', 'Genre', 'Level', 'ObjectDisplayName', 'Question2Objects',
+                'QuestionNObjects', 'StatObject', 'TitleType', 'Value1Template', 'Value2Template']
+        questionsDF = pd.DataFrame(questionsList, columns=keys)
+        questionsDF.to_csv('imdb_questionsList.csv')
+
+    def sportsQueriesGenerator(self, queriesQueue, sourceConfig, startTime):
+
+        #
+        # create jobs for all relevant metrics.
+        for statDef in sourceConfig['StatsDefDict'].values():
+
+            if statDef['Doit']!='y':
+                continue
+
+            print('Metric: {}, Sport:{}, Delta time: {}'.format(statDef['StatName'],
+                                                                statDef['SportCode'],
+                                                                dt.now() - startTime),
+                  flush=True)
+
+            sourceDefinitions = definitions[sourceConfig['Configname']]
+
+            for statObject in statDef['StatObject'].split(','):
+                for statTimeframe in sourceConfig['StatTimeframe'].split(','):
+                    query = sourceConfig['query']
+                    query = query.replace('{StatObject}', statObject)
+                    query = query.replace('{StatTimeframe}', statTimeframe)
+                    query=pu.ProUtils.format_string(query, sourceDefinitions['StatObject'][statObject])
+                    #query=pu.ProUtils.format_string(query, sourceDefinitions['StatTimeframe'][statTimeframe])
+                    query=pu.ProUtils.format_string(query, statDef)
+                    query=pu.ProUtils.format_string(query, sourceConfig)
+                    #print (query)
+                    #
+                    # define the destination table
+                    instructions = statDef
+                    instructions['StatObject'] = statObject
+                    instructions['StatTimeframe'] = statTimeframe
+                    targetTable = pu.ProUtils.format_string(targetTableFormat, instructions).replace('.', '_')
+                    jobDefinition = {
+                        'params': {
+                            'query': query,
+                            'targetDataset': targetDataset,
+                            'targetTable': targetTable,
+                        },
+                        'StatName': statDef['StatName'],
+                        'StatObject': statObject,
+                        'StatTimeframe': statTimeframe
+                    }
+                    queriesQueue.put(jobDefinition)
+
+    def run(self, configurations=[]):
         #
         # main method
 
         startTime = dt.now()
         queriesQueue = multiprocessing.JoinableQueue()  # start a joinable queue to pass messages
 
-        numExecutors = multiprocessing.cpu_count() * 5
-        if len(stats)>0:
-            numExecutors = len(stats) * 2
+        numExecutors = multiprocessing.cpu_count() * 8
+
         producer = multiprocessing.Process(name='QueriesGenerator',
                                            target=self.queriesGenerator,
                                            args=(queriesQueue, numExecutors,),
-                                           kwargs={'all': all, 'sports': sports, 'sources': sources, 'stats': stats})
+                                           kwargs={'configurations': configurations})
         producer.start()
         queriesQueue.join()
         #
@@ -160,7 +289,9 @@ class SimpleStatsGenerator():
                 break
 
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="../sportsight-tests.json"
-generator = SimpleStatsGenerator()#'Baseball.PlayerSeasonStats')
-generator.run(all=True)
-#7generator.run(stats=['pitching.pitchesPerInning'])
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="../../sportsight-tests.json"
+root = os.getcwd() #+ '/sportsight-core/Sportsight-insights'
+generator = SimpleStatsGenerator(root)#'Baseball.PlayerSeasonStats')
+#generator.run(configurations=['Entertainmant.IMDB'])
+generator.run()
+#generator.imdbQuestionsDefGenerator()

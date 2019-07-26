@@ -8,6 +8,8 @@ class InsightsConfigurationManager:
         self.configsheet_url = 'https://docs.google.com/spreadsheets/d/1hsTL7TzdtwPTBe5ZXs4PN1McQ4h5-NctW_KnV9sZQfo/export?format=csv&gid={SheetId}&run=1'
         contentConfig_df = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,'742083111')).fillna('')
         self.contentConfigDict = pu.ProUtils.pandas_df_to_dict(contentConfig_df, 'ContentDefCode')
+        templates_df = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,'2085630088')).fillna('')
+        self.templateDefsDict = pu.ProUtils.pandas_df_to_dict(templates_df, 'TemplateName')
 
         return
 

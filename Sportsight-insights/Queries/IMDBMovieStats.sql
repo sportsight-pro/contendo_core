@@ -8,22 +8,25 @@ FROM (
     '{StatFunction}' AS StatFunction,
     '{StatObject}' AS StatObject,
     '{StatTimeframe}' AS StatTimeframe,
-    '{LeagueCode}' AS LeagueCode,
-    Season AS SeasonCode,
+    '{Genre}' AS LeagueCode,
+    'All' AS SeasonCode,
     'N/A' as CompetitionStageCode,
     'N/A' as CompetitionDay,
     'N/A' AS GameCode,
     'N/A' as GamePeriodCode,
-    CAST(team.id AS STRING) AS TeamCode,
-    CAST({PlayerCode} AS STRING) AS PlayerCode,
+    cast(startYear as string) AS TeamCode,
+    tconst AS PlayerCode,
     '{StatName}' AS StatName,
-    ROUND(stats.{StatName},2) AS StatValue,
-    Count(1) as Count,
+    ROUND({Stat},2) AS StatValue,
+    MAX(imdb_numvotes) as Count,
     '{Description}' as Description
   FROM
-    `sportsight-tests.Baseball1.seasonal_{StatObject}_stats`
-  LEFT JOIN
-    unnest ( Seasondata.{StatObject}StatsTotals )
+    `sportsight-tests.temps.titles_view_v1`
+    WHERE
+      TRUE
+      {StatCondition}
+      AND titleType='{TitleType}'
+      AND imdb_numvotes >= {minVotes}
   GROUP BY
     LeagueCode,
     SeasonCode,

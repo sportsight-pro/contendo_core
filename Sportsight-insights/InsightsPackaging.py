@@ -1,5 +1,4 @@
 from datetime import datetime as dt
-import os, time
 import ProUtils as pu
 import BigqueryUtils as bqu
 import InsightsConfigurationManager as icm
@@ -7,10 +6,10 @@ import pandas as pd
 import random
 
 class InsightsPackaging:
-    def __init__(self):
+    def __init__(self, root='.'):
         self.icm = icm.InsightsConfigurationManager()
         self.bqUtils = bqu.BigqueryUtils()
-        self.questionsReaderQuery = open('./Queries/QuestionsReaderQuery.sql', 'r').read()
+        self.questionsReaderQuery = open(root + '/Queries/QuestionsReaderQuery.sql', 'r').read()
 
     def two_answers_reader(self, contentConfigCode):
         configDef = self.icm.get_content_config(contentConfigCode)
@@ -30,19 +29,22 @@ class InsightsPackaging:
 
         return questionsDF, slotStatGroups, slotStatGroupKeys
 
-    def two_answers_question_generator(self, questionDict):
+    def two_answers_question_generator(self, questionDict, configDef):
         #print(questionDict)
         stat1 = questionDict['Stat1']
         stat2 = questionDict['Stat2']
         questionTemplate = stat1['Question2Objects']
         questionInstructions = stat1
-        questionInstructions['Timeframe'] = "during " + stat1['SeasonCode']
+        questionInstructions['Timeframe'] = configDef['TimeframeText']
         questionText = pu.ProUtils.format_string(questionTemplate, questionInstructions)
+        templateDict = self.icm.templateDefsDict
 
         outQuestion = {
             'QuestionText': questionText,
             'Answer1': stat1['StatObjectName'],
             'Answer2': stat2['StatObjectName'],
+            'Value1': str(eval(templateDict[stat1['Value1Template']]['Template'].replace('{value}', "stat1['StatValue']"))),
+            'Value2': str(eval(templateDict[stat2['Value1Template']]['Template'].replace('{value}', "stat2['StatValue']"))),
         }
         questionKeys=[
             'ContentDefCode', 
@@ -91,19 +93,33 @@ class InsightsPackaging:
         numPackages = configDef['NumPackages']
         numSlots = configDef['NumSlots']
         outputDF = pd.DataFrame()
-        questionsDF, slotStatGroups, slotStatGroupKeys = ip.two_answers_reader(contentConfigCode)
+        questionsDF, slotStatGroups, slotStatGroupKeys = self.two_answers_reader(contentConfigCode)
 
         for packageNo in range(1, numPackages+1):
             selectedStats = set()
             package = []
             packageId = '{}-{}-{}'.format(contentConfigCode, packageNo, int(dt.timestamp(dt.now()) * 1000))
             for slotNo in range(1, numSlots+1):
-                statComb = random.sample(slotStatGroupKeys[slotNo] - selectedStats, 1)[0]
+                while True:
+                    try:
+                        remainingStatCombinations = slotStatGroupKeys[slotNo] - selectedStats
+                        statComb = random.sample(remainingStatCombinations, 1)[0]
+                        break
+
+                    except ValueError:
+                        selectedStats.clear()
+                        continue
+
+                    except Exception as e:
+                        print ("Error selecting a new stat in slot #{}: {}, {}".format(slotNo, e, type(e)))
+
+                selectedStats.add(statComb)
                 questionGroup = slotStatGroups[slotNo][statComb]
                 questionIndex = questionGroup[random.randint(0,len(questionGroup)-1)]
                 questionDict = dict(questionsDF.iloc[questionIndex])
-                newQuestion = self.two_answers_question_generator(questionDict)
+                newQuestion = self.two_answers_question_generator(questionDict, configDef)
                 newQuestion['PackageId'] = packageId
+                newQuestion['Timestamp'] = dt.now()
                 package.append(newQuestion)
             #print(package)
             packageDF = pd.DataFrame(package)
@@ -113,18 +129,8 @@ class InsightsPackaging:
         #
         # write to BigQuery
         #print(outputDF)
-        tableId = 'Sportsight_Packages.two_answers_all'
+        tableId = 'Sportsight_Packages.two_answers_all_V3'
         outputDF.to_gbq(
             tableId,
             if_exists='append'
         )
-
-
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "../sportsight-tests.json"
-startTime = dt.now()
-ip = InsightsPackaging()
-#qdf, ssg, ssgk = ip.two_answers_reader('MLB_2018_Playoff')
-ip.two_answers_package_generator('MLB_2018_Reg')
-ip.two_answers_package_generator('MLB_2019_Reg')
-print('Done, delta time: {}'.format(dt.now() - startTime))
-#print(qdf.shape, len(ssgk), [{i: len(ssgk[i])} for i in ssgk.keys()])

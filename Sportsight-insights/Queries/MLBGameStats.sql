@@ -12,7 +12,7 @@ FROM (
     Season AS SeasonCode,
     'N/A' as CompetitionStageCode,
     'N/A' as CompetitionDay,
-    'N/A' AS GameCode,
+    game.id AS GameCode,
     'N/A' as GamePeriodCode,
     CAST(team.id AS STRING) AS TeamCode,
     CAST({PlayerCode} AS STRING) AS PlayerCode,
@@ -21,9 +21,9 @@ FROM (
     Count(1) as Count,
     '{Description}' as Description
   FROM
-    `sportsight-tests.Baseball1.seasonal_{StatObject}_stats`
+    `sportsight-tests.Baseball1.daily_{StatObject}_stats`
   LEFT JOIN
-    unnest ( Seasondata.{StatObject}StatsTotals )
+    unnest ( gamelogs )
   GROUP BY
     LeagueCode,
     SeasonCode,

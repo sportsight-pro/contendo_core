@@ -1,8 +1,9 @@
-from google.cloud import bigquery
+from google.cloud import bigquery, storage
 
 class BigqueryUtils:
     def __init__(self):
         self.__bigquery_client = bigquery.Client()
+        self.__storage_client  = storage.Client()
 
     def create_dataset(self, datasetId: str):
         #
@@ -17,6 +18,30 @@ class BigqueryUtils:
             dataset = self.__bigquery_client.create_dataset(dataset)
 
         return
+
+    def upload_file_to_gcp(self, bucketName, inFileName, targerFileName):
+        bucket = self.__storage_client.get_bucket(bucketName)
+        blob = bucket.blob(targerFileName)
+        res = blob.upload_from_filename(inFileName)
+        return 'gs://{}/{}'.format(bucketName, targerFileName)
+
+    def create_table_from_gcp_file(self, gcpFileURI, datasetId, tableId, writeDisposition='WRITE_APPEND'):
+        datasetRef = self.__bigquery_client.dataset(datasetId)
+        job_config = bigquery.LoadJobConfig()
+        job_config.autodetect = True
+        job_config.write_disposition = writeDisposition
+        job_config.source_format = bigquery.SourceFormat.NEWLINE_DELIMITED_JSON
+        load_job = self.__bigquery_client.load_table_from_uri(
+            gcpFileURI,
+            datasetRef.table(tableId),
+            job_config=job_config
+        )
+        return load_job.result()
+
+    def execute_query(self, query):
+        query_job = self.__bigquery_client.query(query)
+        result = query_job.result()
+        return result
 
     def execute_query_to_df(self, query):
         query_job = self.__bigquery_client.query(query)

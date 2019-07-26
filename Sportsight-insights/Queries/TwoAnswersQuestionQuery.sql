@@ -12,7 +12,7 @@ twoQuestions AS (
     s1.LeagueCode,
     s1.SeasonCode,
     s1.CompetitionStageCode,
-    s1.MatchStageCode,
+    s1.GamePeriodCode,
     s1.QuestionCode,
     s1.startSlot,
     (
@@ -43,8 +43,8 @@ twoQuestions AS (
   twoQuestionsNumbered AS (
   SELECT
     #ROW_NUMBER() OVER () AS rowNum,
-    ROW_NUMBER() OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, MatchStageCode, QuestionCode ORDER BY questionScore) AS questionCodeRow,
-    COUNT(*) OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, MatchStageCode, QuestionCode) AS questionCodeCount,
+    ROW_NUMBER() OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, GamePeriodCode, QuestionCode ORDER BY questionScore) AS questionCodeRow,
+    COUNT(*) OVER (PARTITION BY StatObject, StatTimeframe, LeagueCode, SeasonCode, CompetitionStageCode, GamePeriodCode, QuestionCode) AS questionCodeCount,
     *
   FROM
     twoQuestions
