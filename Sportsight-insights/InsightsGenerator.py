@@ -64,13 +64,18 @@ class InsightsGenerator:
         nQuestions = self.bqUtils.execute_query_with_schema_and_target(query, dataset_id, table_id)
         return nQuestions
 
-    def two_answers_reader(self, contentConfigCode, nQuestionsToSelect):
-        #
-        # read the questions
-        instructions = {
-            'ContentConfigCode': contentConfigCode,
-            'nQuestionsToSelect': nQuestionsToSelect,
-        }
-        #query =
+
+def test():
+    import os
+    from datetime import datetime as dt
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="../../sportsight-tests.json"
+    startTime = dt.now()
+    root = os.getcwd()
+    ig = InsightsGenerator(root)
+    print('Created insightsGenerator, delta time: {}'.format(dt.now()-startTime))
+    for configCode in ['MLB_2017_Playoff']: #ig.icm.contentConfigDict.keys():
+        print('Starting: ' + configCode)
+        nQuestions = ig.two_answers_generator(configCode)
+        print('Done, created {} questions. delta time: {}'.format(nQuestions, dt.now()-startTime))
 
 

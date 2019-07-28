@@ -12,7 +12,7 @@ class MsfImportMlb:
 
     def __init__(self):
         self.seasons = ['2019-regular', '2017-regular', '2017-playoff', '2018-regular', '2018-playoff']
-        self.seasons = ['2019-regular']
+        #self.seasons = ['2019-regular']
         apikey = '98de7b49-a696-4ed7-8efa-94b28a'
         self.msf = MySportsFeeds(version="2.0")
         self.msf.authenticate(apikey, "MYSPORTSFEEDS")
@@ -35,25 +35,35 @@ class MsfImportMlb:
                     outjson = json.dumps({'Season': season, 'Seasondata': seasondata})
                     jsonfile.write(outjson)
                     jsonfile.write('\n')
-                    delete_query = 'delete from `Baseball1.{}` where season="{}"'.format(feed, season)
-                    self.bqu.execute_query(delete_query)
+                    #delete_query = 'delete from `Baseball1.{}` where season="{}"'.format(feed, season)
+                    #self.bqu.execute_query(delete_query)
 
             jsonfile.close()
             print('Starting upload of file {}, delta-time: {}'.format(outfile_json, dt.now() - start_time))
             uri = self.bqu.upload_file_to_gcp('sport-uploads', outfile_json, outfile_json)
             print('Starting table creation, delta-time: {}'.format(dt.now() - start_time))
-            ret = mi.bqu.create_table_from_gcp_file(uri, 'Baseball1', feed, 'WRITE_TRUNCATE')
+            ret = self.bqu.create_table_from_gcp_file(uri, 'Baseball1', feed, 'WRITE_TRUNCATE')
 
 
     def get_game_days_stats(self):
         start_time=dt.now()
-        query='SELECT * FROM `sportsight-tests.Baseball1.game_days` LIMIT 4000'
-        query_job = _bigquery_client.query(query)
-        games_df = query_job.result().to_dataframe().fillna('')
-        print(games_df.shape)
-        for feed in ['daily_team_gamelogs', 'daily_player_gamelogs']:
-            mainfile = open('results/msf-mlb-dayfeeds-{}-{}.json'.format(feed, dt.now().strftime('%Y%m%dT%H%M%S')),'w')
+        for statObject in ['team', 'player']:
+            feed = 'daily_{}_gamelogs'.format(statObject)
+            #
+            # get the missing game-days
+            query = 'SELECT season,gameDay FROM `Baseball1.missing_{}_gamelogs` group by 1,2'.format(statObject)
+            games_df = self.bqu.execute_query_to_df(query)
+            print(games_df.shape)
+            if (games_df.shape[0] == 0):
+                return
+            #
+            # loop over missing game days
             for i,game in games_df.iterrows():
+                #
+                # open the main file.
+                mainfile_name = 'results/msf-mlb-dayfeeds-{}-{}.json'.format(feed, dt.now().strftime('%Y%m%d'))
+                mainfile = open(mainfile_name, 'w')
+
                 params = {
                     'league': 'mlb',
                     'date': game['gameDay'],
@@ -65,42 +75,82 @@ class MsfImportMlb:
                 if (not os.path.exists(outfile_json)): # and (os.path.getsize(outfile_json)>0):
                     print('Getting msf #{}, {}, delta-time: {}'.format(i, outfile_json, dt.now()-start_time))
                     jsonfile = open(outfile_json, 'w')
-                    seasondata = self.msf.msf_get_data(**params)
+                    #
+                    # Getting the data from MySportsFeeds
+                    try:
+                        seasondata = self.msf.msf_get_data(**params)
+                    except Exception as e:
+                        print('msf_get_data returned with error {}'.format(e))
+                        continue
+                    except Warning as w:
+                        print('msf_get_data returned with warning {}'.format(w))
+                        continue
+
                     jsonfile.write(json.dumps(seasondata))
                     jsonfile.close()
                 else:
                     print('Reading msf #{}, {}, delta-time: {}'.format(i, outfile_json, dt.now()-start_time))
-                    continue
-                    jsonfile = open(outfile_json,'r')
-                    seasondata = json.load(jsonfile)
+                    #
+                    # loading the JSON from already existing file.
+                    try:
+                        jsonfile = open(outfile_json,'r')
+                        seasondata = json.load(jsonfile)
+                    except Exception as e:
+                        print('Error loading JSON from file {}'.format(e))
+                        continue
+
                 dayfeed = {
                     'gamelogs': seasondata['gamelogs'],
                     'lastUpdatedOn': seasondata['lastUpdatedOn'],
                     'season': params['season']
                 }
                 mainfile.write(json.dumps(dayfeed)+'\n')
-            mainfile.close()
+                mainfile.close()
+                #
+                # upload file and update table.
+                try:
+                    print('Starting upload of file {}, delta-time: {}'.format(outfile_json, dt.now() - start_time))
+                    uri = self.bqu.upload_file_to_gcp('sport-uploads', mainfile_name, outfile_json + dt.now().strftime('.%Y%m%dT%H%M%S'))
+                    print('Starting table creation from {}, delta-time: {}'.format(uri, dt.now() - start_time))
+                    ret = self.bqu.create_table_from_gcp_file(uri, 'Baseball1', '{}_{}'.format(feed, game['gameDay']), 'WRITE_TRUNCATE')
+                except Exception as e:
+                    print('Error while uploading table {}'.format(e))
+                    continue
 
     def get_game_pbp(self):
         start_time = dt.now()
-        query='SELECT season,matchname,id as game FROM `sportsight-tests.Baseball1.missing_pbp` where playedStatus="COMPLETED" order by id'
-        games_df = self.bqu.execute_query_to_df(query)
-        print(games_df.shape)
-        for feed in ['game_playbyplay']:
-            outfile_json = 'msf-{}-{}.json'.format(feed,start_time.strftime('%Y%m%dT%H%M%S'))
-            with open(outfile_json, 'w') as jsonfile:
-                for i,game in games_df.iterrows():
-                    params = dict(game)
+        query='SELECT * FROM `sportsight-tests.Baseball1.missing_pbp_bydate`'
+        datesDF = self.bqu.execute_query_to_df(query)
+        print(datesDF.shape)
+        if (datesDF.shape[0]==0):
+            return
+
+        feed = 'game_playbyplay'
+        pbpFilePattern = '/Users/ysherman/Documents/GitHub/results/pbp/msf-pbp-{}-{}.json'
+        for i,dayGames in datesDF.iterrows():
+            dayGames = dict(dayGames)
+            games = dayGames['games']
+            date = dayGames['date'].strftime('%Y-%m-%d')
+            outfile_json='results/temp/{}-{}.json'.format(feed, date)
+            jsonfile = open(outfile_json, 'w')
+            for game in games:
+                pbpFileName = pbpFilePattern.format(game['id'], date)
+                print(pbpFileName)
+                if (not os.path.exists(pbpFileName)):
+                    params = {}
+                    params['season'] = dayGames['season']
+                    params['matchname'] = game['matchname']
+                    params['game'] = game['id']
                     params['format'] = 'json'
                     params['league'] = 'mlb'
                     params['feed']=feed
                     while True:
                         try:
-                            print('Starting match {}, game-id: {}, {}, season: {}, feed: {}, delta-time: {}'.format(
+                            print('Getting for day {}, game-id: {}, {}, season: {}, feed: {}, delta-time: {}'.format(
                                 i,
-                                game['game'],
+                                game['id'],
                                 game['matchname'],
-                                game['season'],
+                                dayGames['season'],
                                 feed,
                                 dt.now() - start_time))
                             seasondata = self.msf.msf_get_data(**params)
@@ -112,20 +162,38 @@ class MsfImportMlb:
                         except:
                             print("Unknow Error")
                         time.sleep(10)
+                    outfile = open(pbpFileName, 'w')
+                    outfile.write(json.dumps(seasondata))
+                    outfile.close()
 
-                    seasondata = self.pbp_to_bigqery_form(seasondata)
-                    seasondata['season'] = game['season']
-                    seasondata['gameid'] = game['game']
-                    seasondata['gamename'] = game['matchname']
-                    outjson = json.dumps(seasondata)
-                    jsonfile.write(outjson)
-                    jsonfile.write('\n')
-                    #break
+                else:
+                    try:
+                        print('Reading file {}'.format(pbpFileName))
+                        pbpfile = open(pbpFileName,'r')
+                        seasondata = json.load(pbpfile)
+                        pbpfile.close()
+                    except Exception as e:
+                        print('Error loading JSON from file {}'.format(e))
+                        continue
+
+                seasondata = self.pbp_to_bigqery_form(seasondata)
+                seasondata['season'] = dayGames['season']
+                seasondata['gameid'] = game['id']
+                seasondata['gamename'] = game['matchname']
+                outjson = json.dumps(seasondata)
+                jsonfile.write(outjson)
+                jsonfile.write('\n')
+            #
+            # uploading file for the day
             jsonfile.close()
-            print('Starting upload of file {}, delta-time: {}'.format(outfile_json, dt.now() - start_time))
-            uri = self.bqu.upload_file_to_gcp('sport-uploads', outfile_json, outfile_json)
-            print('Starting table creation, delta-time: {}'.format(dt.now() - start_time))
-            ret = mi.bqu.create_table_from_gcp_file(uri, 'Baseball1', 'all_playbyplay_new_{}'.format(start_time.strftime('%Y%m%d')))
+            try:
+                print('Starting upload of file {}, delta-time: {}'.format(outfile_json, dt.now() - start_time))
+                uri = self.bqu.upload_file_to_gcp('sport-uploads', outfile_json, outfile_json)
+                print('Starting table creation, delta-time: {}'.format(dt.now() - start_time))
+                ret = self.bqu.create_table_from_gcp_file(uri, 'Baseball1', '{}_{}'.format(feed, date.replace('-','')), 'WRITE_TRUNCATE')
+            except Exception as e:
+                print('Error while uploading table {}'.format(e))
+                continue
 
     def pbp_atbatsubplay_new(self, atBatSubPlay):
         newAtBatSubPlay = []
@@ -197,11 +265,13 @@ class MsfImportMlb:
 
 
 import os
-os.chdir('../../')
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="sportsight-tests.json"
-mi = MsfImportMlb()
-#test_one()
-#mi.get_seasonal_stats()
-mi.get_game_pbp()
-#mi.get_game_days_stats()
-print('Done')
+def test():
+    os.chdir('../../')
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="sportsight-tests.json"
+    mi = MsfImportMlb()
+    #mi.get_seasonal_stats()
+    #mi.get_game_pbp()
+    mi.get_game_days_stats()
+    print('Done')
+
+#test()

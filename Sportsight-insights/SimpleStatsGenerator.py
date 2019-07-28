@@ -288,10 +288,10 @@ class SimpleStatsGenerator():
                 print('Done')
                 break
 
-
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="../../sportsight-tests.json"
-root = os.getcwd() #+ '/sportsight-core/Sportsight-insights'
-generator = SimpleStatsGenerator(root)#'Baseball.PlayerSeasonStats')
-#generator.run(configurations=['Entertainmant.IMDB'])
-generator.run()
-#generator.imdbQuestionsDefGenerator()
+def test():
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="../../sportsight-tests.json"
+    root = os.getcwd() #+ '/sportsight-core/Sportsight-insights'
+    generator = SimpleStatsGenerator(root)#'Baseball.PlayerSeasonStats')
+    #generator.run(configurations=['Entertainmant.IMDB'])
+    generator.run()
+    #generator.imdbQuestionsDefGenerator()
