@@ -72,7 +72,7 @@ class MsfImportMlb:
                     'format': 'json',
                 }
                 outfile_json = 'results/dayfeeds/msf-mlb-{feed}-{season}-{date}.json'.format(**params)
-                if (not os.path.exists(outfile_json)): # and (os.path.getsize(outfile_json)>0):
+                if (not os.path.exists(outfile_json) or True): # and (os.path.getsize(outfile_json)>0):
                     print('Getting msf #{}, {}, delta-time: {}'.format(i, outfile_json, dt.now()-start_time))
                     jsonfile = open(outfile_json, 'w')
                     #
@@ -136,7 +136,7 @@ class MsfImportMlb:
             for game in games:
                 pbpFileName = pbpFilePattern.format(game['id'], date)
                 print(pbpFileName)
-                if (not os.path.exists(pbpFileName)):
+                if (not os.path.exists(pbpFileName) or True):
                     params = {}
                     params['season'] = dayGames['season']
                     params['matchname'] = game['matchname']

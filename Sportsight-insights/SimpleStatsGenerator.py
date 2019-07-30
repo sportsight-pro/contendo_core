@@ -1,4 +1,4 @@
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta
 import os
 import multiprocessing
 import time
@@ -7,10 +7,22 @@ import BigqueryUtils as bqu
 import ProUtils as pu
 
 definitions = {
-    'Baseball.SeasonStats': {
+    'SeasonStats': {
         'StatObject': {
             'team': {'PlayerCode': '"N/A"'},
             'player': {'PlayerCode': 'player.id'},
+        },
+    },
+    'GameStats': {
+        'StatObject': {
+            'team': {'PlayerCode': '"N/A"'},
+            'player': {'PlayerCode': 'player.id'},
+        },
+    },
+    'PBP': {
+        'StatObject': {
+            'team': {'PlayerProperty': '"N/A"'},
+            'player': {},
         },
     },
 }
@@ -29,6 +41,7 @@ class SimpleStatsGenerator():
         sourceConfigDF['enriched'] = False
         self.sourcesConfigDict = pu.ProUtils.pandas_df_to_dict(sourceConfigDF, 'Configname')
         self.sport_configs = {}
+        self.TRUE = True
 
         #
         # read IMDB title definitions
@@ -96,12 +109,13 @@ class SimpleStatsGenerator():
         # Make sure the target dataset exists
         self.bqUtils.create_dataset(targetDataset)
         #
+        # if there are only partial list of configurations
+        if len(configurations) == 0 :
+            configurations = self.sourcesConfigDict.keys()
+        #
         # loop over all configurations and generate
-        for sourceConfigName in self.sourcesConfigDict.keys():
-            #
-            # if there are only partial list of configurations
-            if (len(configurations)>0) and (sourceConfigName not in configurations):
-                continue
+        print(configurations)
+        for sourceConfigName in configurations:
             #
             # get the source configuration
             sourceConfig = self.get_source_configuration(sourceConfigName)
@@ -111,6 +125,7 @@ class SimpleStatsGenerator():
                 continue
             #
             # call the relevant generation function.
+            print ("running configuration {}".format(sourceConfigName))
             generatorFunc = eval('self.{}'.format(sourceConfig['generatorFunc']))
             generatorFunc(queriesQueue, sourceConfig, startTime)
         #
@@ -159,6 +174,7 @@ class SimpleStatsGenerator():
                     # define the destination table
                     instructions = _statDef
                     instructions['StatTimeframe'] = sourceConfig['StatTimeframe']
+                    instructions['StatSource'] = sourceConfig['StatSource']
                     targetTable = pu.ProUtils.format_string(targetTableFormat, instructions).replace('.', '_').replace('-', '_')
                     jobDefinition = {
                         'params': {
@@ -167,7 +183,7 @@ class SimpleStatsGenerator():
                             'targetTable': targetTable,
                         },
                         'StatName': _statDef['StatName'],
-                        'StatObject': sourceConfig['StatObject'],
+                        'StatObject': titleType,
                         'StatTimeframe': sourceConfig['StatTimeframe']
                     }
                     queriesQueue.put(jobDefinition)
@@ -213,8 +229,27 @@ class SimpleStatsGenerator():
         questionsDF = pd.DataFrame(questionsList, columns=keys)
         questionsDF.to_csv('imdb_questionsList.csv')
 
-    def sportsQueriesGenerator(self, queriesQueue, sourceConfig, startTime):
+    def days_range(self, interval, prev):
+        instructions = {}
+        startDate = (dt.today()-timedelta(days=interval+prev-1))
+        endDate = (dt.today()-timedelta(days=prev))
+        condTemplate = '{DateProperty} BETWEEN "{StartDate}" and "{EndDate}"'
+        condInst = {'StartDate': startDate.strftime('%Y%m%d'), 'EndDate': endDate.strftime('%Y%m%d')}
+        instructions['StatCondition'] = pu.ProUtils.format_string(condTemplate, condInst)
+        instructions['DaysRange'] = '{}...{}'.format(startDate.strftime('%Y-%m-%d'), endDate.strftime('%Y-%m-%d'))
+        return instructions
 
+    def games_days_range(self, interval, prev):
+        instructions = {}
+        startDate = (dt.today()-timedelta(days=interval+prev-1))
+        endDate = (dt.today()-timedelta(days=prev))
+        condTemplate = '{DateProperty} BETWEEN "{StartDate}" and "{EndDate}"'
+        condInst = {'StartDate': startDate.strftime('%Y%m%d'), 'EndDate': endDate.strftime('%Y%m%d')}
+        instructions['StatCondition'] = pu.ProUtils.format_string(condTemplate, condInst)
+        instructions['DaysRange'] = 'N/A'
+        return instructions
+
+    def sportsQueriesGenerator(self, queriesQueue, sourceConfig, startTime):
         #
         # create jobs for all relevant metrics.
         for statDef in sourceConfig['StatsDefDict'].values():
@@ -227,15 +262,19 @@ class SimpleStatsGenerator():
                                                                 dt.now() - startTime),
                   flush=True)
 
-            sourceDefinitions = definitions[sourceConfig['Configname']]
+            sourceDefinitions = definitions[sourceConfig['StatSource']]
 
             for statObject in statDef['StatObject'].split(','):
                 for statTimeframe in sourceConfig['StatTimeframe'].split(','):
                     query = sourceConfig['query']
                     query = query.replace('{StatObject}', statObject)
                     query = query.replace('{StatTimeframe}', statTimeframe)
-                    query=pu.ProUtils.format_string(query, sourceDefinitions['StatObject'][statObject])
-                    #query=pu.ProUtils.format_string(query, sourceDefinitions['StatTimeframe'][statTimeframe])
+                    if sourceConfig['StatCondition'] != '':
+                        query = pu.ProUtils.format_string(query, eval("self."+sourceConfig['StatCondition']))
+                    else:
+                        query = pu.ProUtils.format_string(query, {'StatCondition': True})
+
+                    query = pu.ProUtils.format_string(query, sourceDefinitions['StatObject'][statObject])
                     query=pu.ProUtils.format_string(query, statDef)
                     query=pu.ProUtils.format_string(query, sourceConfig)
                     #print (query)
@@ -244,6 +283,7 @@ class SimpleStatsGenerator():
                     instructions = statDef
                     instructions['StatObject'] = statObject
                     instructions['StatTimeframe'] = statTimeframe
+                    instructions['StatSource'] = sourceConfig['StatSource']
                     targetTable = pu.ProUtils.format_string(targetTableFormat, instructions).replace('.', '_')
                     jobDefinition = {
                         'params': {
@@ -292,6 +332,9 @@ def test():
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="../../sportsight-tests.json"
     root = os.getcwd() #+ '/sportsight-core/Sportsight-insights'
     generator = SimpleStatsGenerator(root)#'Baseball.PlayerSeasonStats')
-    #generator.run(configurations=['Entertainmant.IMDB'])
-    generator.run()
+    #generator.run()
+    generator.run(configurations=['Baseball.PBP.Last7Days', 'Baseball.PBP.Last30Days', 'Baseball.PBP.Season'])
+    #print(generator.days_range(30,1))
     #generator.imdbQuestionsDefGenerator()
+
+#test()

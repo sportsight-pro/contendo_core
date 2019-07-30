@@ -14,18 +14,17 @@ FROM (
     '{DaysRange}' as CompetitionDay,
     CAST({GameCode} as STRING) AS GameCode,
     'N/A' as GamePeriodCode,
-    CAST(team.id AS STRING) AS TeamCode,
-    CAST({PlayerCode} AS STRING) AS PlayerCode,
+    CAST({TeamType}.id AS STRING) AS TeamCode,
+    CAST({PlayerProperty} AS STRING) AS PlayerCode,
     '{StatName}' AS StatName,
-    ROUND({StatFunction}(stats.{StatName}),2) AS StatValue,
-    Countif(stats.{StatName}>0) as Count,
+    ROUND({StatFunction}({PropertyName}),2) AS StatValue,
+    Countif({PropertyName}>0) as Count,
     '{Description}' as Description
   FROM
-    `sportsight-tests.Baseball1.daily_{StatObject}_gamelogs_*`
-  LEFT JOIN
-    unnest ( gamelogs )
+    `sportsight-tests.Baseball1.atBatPlays_pbp_enriched`
   WHERE
     {StatCondition}
+    AND {PBPCondition}
   GROUP BY
     LeagueCode,
     SeasonCode,
