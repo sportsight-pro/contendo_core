@@ -40,4 +40,4 @@ def questions_generation():
         print('Done packaging, delta time: {}'.format(dt.now() - startTime))
 
 import_and_generate_stats()
-questions_generation()
+#questions_generation()

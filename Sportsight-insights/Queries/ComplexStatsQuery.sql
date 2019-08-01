@@ -10,19 +10,18 @@ WITH
     SeasonCode,
     CompetitionStageCode,
     CompetitionDay,
-    MatchCode,
-    MatchStageCode,
+    GameCode,
+    GamePeriodCode,
     TeamCode,
     PlayerCode,
     StatName,
-    SUM(StatValue) as StatValue,
-    Count,
-    Description
+    SUM(StatValue) as StatValue
  FROM
  `Sportsight_Stats.all_stats`
   WHERE
-    STRPOS('{NumeratorStatNames}', StatName) > 0
-    AND STRPOS('{StatTimeframe}', StatTimeframe) > 0
+    StatName in ({NumeratorStatNames})
+    AND StatTimeframe in ({StatTimeframes})
+    AND StatObject in ({StatObjects})
   GROUP BY
     SportCode,
     StatSource,
@@ -33,13 +32,11 @@ WITH
     SeasonCode,
     CompetitionStageCode,
     CompetitionDay,
-    MatchCode,
-    MatchStageCode,
+    GameCode,
+    GamePeriodCode,
     TeamCode,
     PlayerCode,
-    StatName,
-    Count,
-    Description
+    StatName
   ),
   denominatorStats AS (
   SELECT
@@ -52,19 +49,18 @@ WITH
     SeasonCode,
     CompetitionStageCode,
     CompetitionDay,
-    MatchCode,
-    MatchStageCode,
+    GameCode,
+    GamePeriodCode,
     TeamCode,
     PlayerCode,
     StatName,
-    SUM(StatValue) as StatValue,
-    Count,
-    Description
+    SUM(StatValue) as StatValue
   FROM
     `Sportsight_Stats.all_stats`
   WHERE
-    STRPOS('{DenominatorStatNames}', StatName) > 0
-    AND STRPOS('{StatTimeframe}', StatTimeframe) > 0
+    StatName in ({DenominatorStatNames})
+    AND StatTimeframe in ({StatTimeframes})
+    AND StatObject in ({StatObjects})
   GROUP BY
     SportCode,
     StatSource,
@@ -75,13 +71,11 @@ WITH
     SeasonCode,
     CompetitionStageCode,
     CompetitionDay,
-    MatchCode,
-    MatchStageCode,
+    GameCode,
+    GamePeriodCode,
     TeamCode,
     PlayerCode,
-    StatName,
-    Count,
-    Description
+    StatName
   ),
   numeratorDenominatorJoin AS (
   SELECT
@@ -97,14 +91,16 @@ WITH
     numeratorStats
   ON
     denominatorStats.SportCode = numeratorStats.SportCode
-    AND denominatorStats.StatSource = numeratorStats.StatSource
+    #AND denominatorStats.StatSource = numeratorStats.StatSource
+    #AND denominatorStats.StatFunction = numeratorStats.StatFunction
     AND denominatorStats.StatObject = numeratorStats.StatObject
     AND denominatorStats.StatTimeframe = numeratorStats.StatTimeframe
     AND denominatorStats.LeagueCode = numeratorStats.LeagueCode
     AND denominatorStats.SeasonCode = numeratorStats.SeasonCode
     AND denominatorStats.CompetitionStageCode = numeratorStats.CompetitionStageCode
     AND denominatorStats.CompetitionDay = numeratorStats.CompetitionDay
-    AND denominatorStats.MatchStageCode = numeratorStats.MatchStageCode
+    AND denominatorStats.GameCode = numeratorStats.GameCode
+    AND denominatorStats.GamePeriodCode = numeratorStats.GamePeriodCode
     AND denominatorStats.TeamCode = numeratorStats.TeamCode
     AND denominatorStats.PlayerCode = numeratorStats.PlayerCode
   WHERE
@@ -122,13 +118,14 @@ WITH
     numeratorStats.SeasonCode,
     numeratorStats.CompetitionStageCode,
     numeratorStats.CompetitionDay,
-    numeratorStats.MatchCode,
-    numeratorStats.MatchStageCode,
+    numeratorStats.GameCode,
+    numeratorStats.GamePeriodCode,
     numeratorStats.TeamCode,
     numeratorStats.PlayerCode,
     '{StatName}' AS StatName,
-    ROUND((IF(numeratorStats.StatValue IS NULL, 0, numeratorStats.StatValue)/denominatorStats.StatValue)*{StatRatio}, 2) AS StatValue,
+    ROUND(AVG(IF(numeratorStats.StatValue IS NULL, 0, numeratorStats.StatValue)/denominatorStats.StatValue)*{StatRatio}, 2) AS StatValue,
     CAST(ROUND(SUM(denominatorStats.StatValue),0) AS int64) AS Count,
+    #count(*) as Count,
     "{Description}" as Description
   FROM
     numeratorDenominatorJoin
@@ -142,12 +139,11 @@ WITH
     SeasonCode,
     CompetitionStageCode,
     CompetitionDay,
-    MatchCode,
-    MatchStageCode,
+    GameCode,
+    GamePeriodCode,
     TeamCode,
     PlayerCode,
     StatName,
-    Count,
     Description
 )
 SELECT
@@ -160,15 +156,15 @@ SELECT
     SeasonCode,
     CompetitionStageCode,
     CompetitionDay,
-    MatchCode,
-    MatchStageCode,
+    GameCode,
+    GamePeriodCode,
     TeamCode,
     PlayerCode,
     StatName,
     StatValue,
     Count,
     Description,
-    DENSE_RANK() OVER (PARTITION BY statlevel, LeagueCode, seasonid, CompetitionPhase, MetricName ORDER BY StatValue DESC) AS DenseRank
+    DENSE_RANK() OVER (PARTITION BY StatObject, LeagueCode, SeasonCode, CompetitionStageCode, StatName ORDER BY StatValue DESC) AS DenseRank
 FROM
     newStatCalc
 ORDER BY

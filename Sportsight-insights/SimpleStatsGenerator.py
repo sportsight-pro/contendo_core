@@ -78,7 +78,7 @@ class SimpleStatsGenerator():
     def queryExecutor(self, i, query_jobs):
         #
         # execute a list of query jobs
-        print('Start executor %d' % i)
+        #print('Start executor %d' % i)
         startTime = dt.now()
         for queryJob in iter(query_jobs.get, self.sentinel):
             #
@@ -95,13 +95,17 @@ class SimpleStatsGenerator():
                       flush=True)
                 query_jobs.task_done()
             except Exception as e:
+                queryFile = 'errors/{}.sql'.format(queryJob['params']['targetTable'])
+                f = open(queryFile, 'w')
+                f.write(queryJob['params']['query'])
+                f.close()
                 # print(queryJob['query'],flush=True)
                 print('Error {} with Statname: {}, StatObject: {}, StatTimeframe: {}'.format(e,
                                                                                        queryJob['StatName'],
                                                                                        queryJob['StatObject'],
                                                                                        queryJob['StatTimeframe']),
                                                                                        flush=True)
-        print('Consumer {} terminates, Deltatime: {}'.format(str(i), dt.now() - startTime), flush=True)
+        #print('Consumer {} terminates, Deltatime: {}'.format(str(i), dt.now() - startTime), flush=True)
 
     def queriesGenerator(self, queriesQueue, numExecutors, configurations=[]):
         startTime = dt.now()
@@ -114,7 +118,7 @@ class SimpleStatsGenerator():
             configurations = self.sourcesConfigDict.keys()
         #
         # loop over all configurations and generate
-        print(configurations)
+        #print(configurations)
         for sourceConfigName in configurations:
             #
             # get the source configuration
@@ -142,10 +146,7 @@ class SimpleStatsGenerator():
             if statDef['Doit']!='y':
                 continue
 
-            print('Metric: {}, Sport:{}, Delta time: {}'.format(statDef['StatName'],
-                                                                statDef['SportCode'],
-                                                                dt.now() - startTime),
-                  flush=True)
+            #print('Metric: {}, Sport:{}, Delta time: {}'.format(statDef['StatName'], statDef['SportCode'], dt.now() - startTime), flush=True)
 
             for titleType in statDef['TitleType'].split(','):
                 titletypeConfig = self.titletypesConfigDict[titleType]
@@ -257,10 +258,7 @@ class SimpleStatsGenerator():
             if statDef['Doit']!='y':
                 continue
 
-            print('Metric: {}, Sport:{}, Delta time: {}'.format(statDef['StatName'],
-                                                                statDef['SportCode'],
-                                                                dt.now() - startTime),
-                  flush=True)
+            #print('Metric: {}, Sport:{}, Delta time: {}'.format(statDef['StatName'], statDef['SportCode'], dt.now() - startTime), flush=True)
 
             sourceDefinitions = definitions[sourceConfig['StatSource']]
 
@@ -297,14 +295,53 @@ class SimpleStatsGenerator():
                     }
                     queriesQueue.put(jobDefinition)
 
-    def run(self, configurations=[]):
+    def complexQueriesGenerator(self, queriesQueue, sourceConfig, startTime):
+        #
+        # create jobs for all relevant metrics.
+        for statDef in sourceConfig['StatsDefDict'].values():
+
+            if statDef['Doit']!='y':
+                continue
+
+            #print('Metric: {}, Sport:{}, Delta time: {}'.format(statDef['StatName'], statDef['SportCode'], dt.now() - startTime), flush=True)
+            inst={}
+            inst ['StatTimeframes'] = pu.ProUtils.commastring_to_liststring(statDef['StatTimeframes'])
+            inst['StatObjects'] = pu.ProUtils.commastring_to_liststring(statDef['StatObjects'])
+            inst['NumeratorStatNames'] = pu.ProUtils.commastring_to_liststring(statDef['NumeratorStatNames'])
+            inst['DenominatorStatNames'] = pu.ProUtils.commastring_to_liststring(statDef['DenominatorStatNames'])
+            query = sourceConfig['query']
+            query=pu.ProUtils.format_string(query, inst)
+            query=pu.ProUtils.format_string(query, statDef)
+            query=pu.ProUtils.format_string(query, sourceConfig)
+            #print (query)
+            #
+            # define the destination table
+            instructions = statDef
+            instructions['StatObject'] = statDef['StatObjects'].replace(',', '_')
+            instructions['StatTimeframe'] = statDef['StatTimeframes'].replace(',', '_')
+            instructions['StatSource'] = sourceConfig['StatSource']
+            targetTable = pu.ProUtils.format_string(targetTableFormat, instructions).replace('.', '_')
+            jobDefinition = {
+                'params': {
+                    'query': query,
+                    'targetDataset': targetDataset,
+                    'targetTable': targetTable,
+                },
+                'StatName': statDef['StatName'],
+                'StatObject': instructions['StatObject'],
+                'StatTimeframe': instructions['StatTimeframe']
+            }
+            queriesQueue.put(jobDefinition)
+
+    def run(self, configurations=[], numExecutors=0):
         #
         # main method
 
         startTime = dt.now()
         queriesQueue = multiprocessing.JoinableQueue()  # start a joinable queue to pass messages
 
-        numExecutors = multiprocessing.cpu_count() * 8
+        if numExecutors==0:
+            numExecutors = multiprocessing.cpu_count() * 8
 
         producer = multiprocessing.Process(name='QueriesGenerator',
                                            target=self.queriesGenerator,
@@ -329,11 +366,14 @@ class SimpleStatsGenerator():
                 break
 
 def test():
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="../../sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="sportsight-tests.json"
     root = os.getcwd() #+ '/sportsight-core/Sportsight-insights'
+    os.chdir('../../')
     generator = SimpleStatsGenerator(root)#'Baseball.PlayerSeasonStats')
     #generator.run()
-    generator.run(configurations=['Baseball.PBP.Last7Days', 'Baseball.PBP.Last30Days', 'Baseball.PBP.Season'])
+    #generator.run(configurations=['Baseball.PBP.Last7Days', 'Baseball.PBP.Last30Days', 'Baseball.PBP.Season'])
+    #generator.run(configurations=['Baseball.ComposedStats'], numExecutors=5)
+    generator.run(configurations=['Baseball.GameStats.Last7Days'])
     #print(generator.days_range(30,1))
     #generator.imdbQuestionsDefGenerator()
 

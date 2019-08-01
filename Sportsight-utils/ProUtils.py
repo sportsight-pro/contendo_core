@@ -28,3 +28,13 @@ class ProUtils:
             if key in updateDict.keys():
                 inDict['{}{}'.format(key, suffix)] = updateDict[key]
         return inDict
+
+    #
+    # utility to add a record to a dict object
+    @staticmethod
+    def commastring_to_liststring(commaString):
+        ret = str(str.split(commaString, ',')).replace('[', '').replace(']', '')
+        return ret
+
+#pu = ProUtils()
+#print(pu.commastring_to_liststring('a,b,c,d'))
