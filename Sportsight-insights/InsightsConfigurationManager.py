@@ -24,6 +24,7 @@ class InsightsConfigurationManager:
         insightConfig_df['SeasonCodes'] = contentConfig['SeasonCode']
         insightConfig_df['SportCode'] = contentConfig['SportCode']
         insightConfig_df['NumSlots'] = contentConfig['NumSlots']
+        insightConfig_df['StatTimeframes'] = contentConfig['StatTimeframes']
         insightConfig_df['StartSlot'] = 1
         #
         # Writing to BQ.

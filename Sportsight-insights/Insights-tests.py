@@ -33,11 +33,16 @@ def questions_generation():
           configCode.index('_')
         except:
             continue
-        print('Starting: ' + configCode)
-        #nQuestions = ig.two_answers_generator(configCode)
-        #print('Done questions generation, created {} questions. delta time: {}'.format(nQuestions, dt.now()-startTime))
-        ip.two_answers_package_generator(configCode)
-        print('Done packaging, delta time: {}'.format(dt.now() - startTime))
+        try:
+            print('Starting: ' + configCode)
+            nQuestions = ig.two_answers_generator(configCode)
+            print('Done questions generation, created {} questions. delta time: {}'.format(nQuestions, dt.now()-startTime))
+            ip.two_answers_package_generator(configCode)
+            print('Done packaging, delta time: {}'.format(dt.now() - startTime))
+        except Exception as e:
+            print("Error: {}".format(e))
+            continue
 
-import_and_generate_stats()
-#questions_generation()
+
+#import_and_generate_stats()
+questions_generation()

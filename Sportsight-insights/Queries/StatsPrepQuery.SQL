@@ -5,6 +5,7 @@ WITH
     StatName AS StatCode,
     StatObject AS StatObjects,
     SeasonCodes,
+    StatTimeframes,
     Question2Objects,
     startSlot,
     Value1Template,
@@ -42,6 +43,7 @@ WITH
     AND TeamCode IS NOT NULL
     AND PlayerCode IS NOT NULL
     AND StatValue>0
+    AND STRPOS(StatTimeframes, StatTimeframe) > 0
     AND STRPOS(StatObjects, StatObject) > 0
     AND STRPOS(SeasonCodes, SeasonCode) > 0 ),
   insightStats_valrange AS (

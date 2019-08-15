@@ -1,4 +1,3 @@
-#!pip install --upgrade ohmysportsfeedspy
 from datetime import datetime as dt
 import time
 from ohmysportsfeedspy import MySportsFeeds

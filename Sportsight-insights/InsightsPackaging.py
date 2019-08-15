@@ -35,7 +35,9 @@ class InsightsPackaging:
         stat2 = questionDict['Stat2']
         questionTemplate = stat1['Question2Objects']
         questionInstructions = stat1
-        questionInstructions['Timeframe'] = configDef['TimeframeText']
+        timeFrameTexts = configDef['TimeframeText'].split(',')
+        loc = random.randint(0,len(timeFrameTexts)-1)
+        questionInstructions['Timeframe'] = timeFrameTexts[loc]
         questionText = pu.ProUtils.format_string(questionTemplate, questionInstructions)
         templateDict = self.icm.templateDefsDict
 

@@ -17,6 +17,15 @@ class InsightsGenerator:
     def get_dataset_and_table(self, contentConfigCode):
         return 'temp', 'questions_'+contentConfigCode
 
+    def trend_teams_filter(self, top=30, minTrend=0):
+        query = 'SELECT TeamId, Trend FROM `sportsight-tests.Baseball1.teams_trend` where Trend>{} order by trend desc limit {}'.format(minTrend,top)
+        teamsDF = self.bqUtils.execute_query_to_df(query)
+        teamsList = list(teamsDF['TeamId'])
+        inst={}
+        inst['teamIDs'] = str(teamsList).replace('[', '(').replace(']', ')')
+        #return 'stat1.TeamCode in {teamIDs} or stat2.TeamCode in {teamIDs}'.format(**inst)
+        return 'TeamCode in {teamIDs}'.format(**inst)
+
     def one_team_filter(self, teamCode):
         return '"{}" in (stat1.TeamCode, stat2.TeamCode)'.format(teamCode)
 
@@ -72,6 +81,9 @@ def test():
     startTime = dt.now()
     root = os.getcwd()
     ig = InsightsGenerator(root)
+    print(ig.trend_teams_filter(10,1))
+    return
+
     print('Created insightsGenerator, delta time: {}'.format(dt.now()-startTime))
     for configCode in ['MLB_2017_Playoff']: #ig.icm.contentConfigDict.keys():
         print('Starting: ' + configCode)
@@ -79,3 +91,4 @@ def test():
         print('Done, created {} questions. delta time: {}'.format(nQuestions, dt.now()-startTime))
 
 
+#test()
