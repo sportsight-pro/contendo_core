@@ -25,8 +25,8 @@ class EODHistoricalDataImport(ProducerConsumersEngine.ProducerConsumersEngine):
         csv_dir = self.main_dir + 'dated-files/'
         if not os.path.exists(csv_dir):
             os.mkdir(csv_dir)
-        datesPD = self.bqu.execute_query_to_df ("SELECT distinct format_date('%Y-%m-%d', timestamp) as Date FROM `sportsight-tests.Finance_Data.daily_stock_history_*` where timestamp<=date_sub(current_date(), interval 2 day) order by Date desc limit 300")
-        datesList = list(datesPD['Date'])
+        #datesPD = self.bqu.execute_query_to_df ("SELECT distinct format_date('%Y-%m-%d', timestamp) as Date FROM `sportsight-tests.Finance_Data.daily_stock_history_*` where timestamp<=date_sub(current_date(), interval 2 day) order by Date desc limit 300")
+        datesList = ['2019-08-21'] #list(datesPD['Date'])
         for date in datesList:
             dailyDF = pd.DataFrame()
             for exchange in ['COMM', 'INDX', 'NASDAQ', 'NYSE']:
@@ -43,10 +43,12 @@ class EODHistoricalDataImport(ProducerConsumersEngine.ProducerConsumersEngine):
                 #break
             tableId = 'Finance_Data.eod_history_data_{}'.format(date.replace('-', ''))
             print('Writing table {}, size {}, delta time {}'.format(tableId, dailyDF.shape, dt.now()-startTime))
-            dailyDF.to_gbq(
-                tableId,
-                if_exists='replace'
-            )
+
+            if dailyDF.shape[0]>0:
+                dailyDF.to_gbq(
+                    tableId,
+                    if_exists='replace'
+                )
 
             #break
         print('Done', dt.now()-startTime)

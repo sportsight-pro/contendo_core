@@ -20,7 +20,7 @@ class MsfImportMlb:
     def get_seasonal_stats(self):
         start_time=dt.now()
         for feed in ['seasonal_games', 'seasonal_team_stats', 'seasonal_player_stats']:
-            outfile_json = 'results/msf-mlb-{}-{}.json'.format(feed, dt.now().strftime('%Y%m%dT%H%M%S'))
+            outfile_json = 'results/MLB/msf-mlb-{}-{}.json'.format(feed, dt.now().strftime('%Y%m%dT%H%M%S'))
             with open(outfile_json, 'w') as jsonfile:
                 for season in self.seasons:
                     params = {
@@ -60,7 +60,7 @@ class MsfImportMlb:
             for i,game in games_df.iterrows():
                 #
                 # open the main file.
-                mainfile_name = 'results/msf-mlb-dayfeeds-{}-{}.json'.format(feed, dt.now().strftime('%Y%m%d'))
+                mainfile_name = 'results/MLB/msf-mlb-dayfeeds-{}-{}.json'.format(feed, dt.now().strftime('%Y%m%d'))
                 mainfile = open(mainfile_name, 'w')
 
                 params = {
@@ -70,7 +70,7 @@ class MsfImportMlb:
                     'feed': feed,
                     'format': 'json',
                 }
-                outfile_json = 'results/dayfeeds/msf-mlb-{feed}-{season}-{date}.json'.format(**params)
+                outfile_json = 'results/MLB/dayfeeds/msf-mlb-{feed}-{season}-{date}.json'.format(**params)
                 if (not os.path.exists(outfile_json) or True): # and (os.path.getsize(outfile_json)>0):
                     print('Getting msf #{}, {}, delta-time: {}'.format(i, outfile_json, dt.now()-start_time))
                     jsonfile = open(outfile_json, 'w')
@@ -125,12 +125,12 @@ class MsfImportMlb:
             return
 
         feed = 'game_playbyplay'
-        pbpFilePattern = '/Users/ysherman/Documents/GitHub/results/pbp/msf-pbp-{}-{}.json'
+        pbpFilePattern = '/Users/ysherman/Documents/GitHub/results/MLB/pbp/msf-pbp-{}-{}.json'
         for i,dayGames in datesDF.iterrows():
             dayGames = dict(dayGames)
             games = dayGames['games']
             date = dayGames['date'].strftime('%Y-%m-%d')
-            outfile_json='results/temp/{}-{}.json'.format(feed, date)
+            outfile_json='results/MLB/temp/{}-{}.json'.format(feed, date)
             jsonfile = open(outfile_json, 'w')
             for game in games:
                 pbpFileName = pbpFilePattern.format(game['id'], date)

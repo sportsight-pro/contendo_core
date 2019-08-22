@@ -414,7 +414,7 @@ class SimpleStatsGenerator():
                 break
 
 def test():
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
     root = os.getcwd() #+ '/sportsight-core/Sportsight-insights'
     os.chdir('../../')
     generator = SimpleStatsGenerator(root)#'Baseball.PlayerSeasonStats')
@@ -425,4 +425,4 @@ def test():
     #print(generator.days_range(30,1))
     #generator.imdbQuestionsDefGenerator()
 
-test()
+#test()
