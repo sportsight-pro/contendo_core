@@ -23,6 +23,8 @@ class MLBTrends:
         pytrends = TrendReq(hl='en-US', tz=360)
         for team in teams_list:
             # for i in [0,5,10,15,20,25]:
+            time.sleep(3)
+            print(team)
             pytrends.build_payload([team],  # teams_list[i:i+5],
                                    cat=259,
                                    timeframe='today 3-m',
@@ -48,7 +50,7 @@ class MLBTrends:
         summary_table = summary_table.sort_values(by=['Trend'], ascending=False)
         summary_table['teamFullName'] = summary_table.index
         summary_table = summary_table.join(teams_df.set_index('teamFullName')).sort_values(by=['Trend'], ascending=False)
-        tableName = 'Baseball1.teams_trend'  # _{}'.format()
+        tableName = 'Baseball1.mlb_teams_trend_{}'.format(dt.now().strftime('%Y%m%d'))  # _{}'.format()
         summary_table.to_gbq(
             tableName,
             project_id='sportsight-tests',

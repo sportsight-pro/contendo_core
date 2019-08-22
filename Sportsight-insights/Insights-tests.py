@@ -44,5 +44,5 @@ def questions_generation():
             continue
 
 
-#import_and_generate_stats()
+import_and_generate_stats()
 questions_generation()

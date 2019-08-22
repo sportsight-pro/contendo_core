@@ -94,6 +94,10 @@ class SimpleStatsGenerator():
                     dt.now() - startTime),
                       flush=True)
                 query_jobs.task_done()
+                queryFile = 'results/queries/{}.sql'.format(queryJob['params']['targetTable'])
+                f = open(queryFile, 'w')
+                f.write(queryJob['params']['query'])
+                f.close()
             except Exception as e:
                 queryFile = 'errors/{}.sql'.format(queryJob['params']['targetTable'])
                 f = open(queryFile, 'w')
@@ -137,6 +141,51 @@ class SimpleStatsGenerator():
         for i in range(numExecutors):
             queriesQueue.put(self.sentinel)  # indicate sentinel
 
+    def financeQueriesGenerator(self, queriesQueue, sourceConfig, startTime):
+        #
+        # target table definitions
+        financeTableFormat = 'Stat_Finance_{StatSource}_{StatName}_{StatObject}_Rolling_{RollingDays}'
+        financeStatsDataset = 'Finance_Stats'
+        self.bqUtils.create_dataset(financeStatsDataset)
+
+        #
+        # create jobs for all relevant metrics.
+        for statDef in sourceConfig['StatsDefDict'].values():
+
+            if statDef['Doit']!='y':
+                continue
+
+            #print('Metric: {}, Sport:{}, Delta time: {}'.format(statDef['StatName'], statDef['SportCode'], dt.now() - startTime), flush=True)
+
+            for statObject in statDef['StatObject'].split(','):
+                for rollingDays in statDef['RollingDaysList'].split(','):
+                    _statDef = statDef.copy()
+                    _statDef['StatObject'] = statObject
+                    rollingDaysInst = {'RollingDays': rollingDays}
+                    query = sourceConfig['query']
+                    query=pu.ProUtils.format_string(query, _statDef)
+                    query=pu.ProUtils.format_string(query, sourceConfig)
+                    query=pu.ProUtils.format_string(query, rollingDaysInst)
+                    #print (query)
+                    #
+                    # define the destination table
+                    instructions = _statDef
+                    instructions['StatTimeframe'] = sourceConfig['StatTimeframe']
+                    instructions['StatSource'] = sourceConfig['StatSource']
+                    instructions['RollingDays'] = rollingDays
+                    targetTable = pu.ProUtils.format_string(financeTableFormat, instructions).replace('.', '_').replace('-', '_')
+                    jobDefinition = {
+                        'params': {
+                            'query': query,
+                            'targetDataset': financeStatsDataset,
+                            'targetTable': targetTable,
+                        },
+                        'StatName': _statDef['StatName'],
+                        'StatObject': statObject,
+                        'StatTimeframe': '{}_Rollingdays'.format(rollingDays)
+                    }
+                    queriesQueue.put(jobDefinition)
+
     def imdbQueriesGenerator(self, queriesQueue, sourceConfig, startTime):
 
         #
@@ -170,7 +219,6 @@ class SimpleStatsGenerator():
                     query=pu.ProUtils.format_string(query, sourceConfig)
                     query=pu.ProUtils.format_string(query, titletypeConfig)
                     #print (query)
-                    #a=b
                     #
                     # define the destination table
                     instructions = _statDef
@@ -373,8 +421,8 @@ def test():
     #generator.run()
     #generator.run(configurations=['Baseball.PBP.Last7Days', 'Baseball.PBP.Last30Days', 'Baseball.PBP.Season'])
     #generator.run(configurations=['Baseball.ComposedStats'], numExecutors=5)
-    generator.run(configurations=['Baseball.GameStats.Last7Days'])
+    generator.run(configurations=['Finance.AlphaVantage'])
     #print(generator.days_range(30,1))
     #generator.imdbQuestionsDefGenerator()
 
-#test()
+test()

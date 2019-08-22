@@ -38,14 +38,40 @@ class BigqueryUtils:
         )
         return load_job.result()
 
+    def create_table_from_local_file(self, localFile, datasetId, tableId, writeDisposition='WRITE_TRUNCATE', fileType=bigquery.SourceFormat.CSV):
+        datasetRef = self.__bigquery_client.dataset(datasetId)
+        job_config = bigquery.LoadJobConfig()
+        job_config.autodetect = True
+        job_config.write_disposition = writeDisposition
+        job_config.source_format = fileType
+        load_job = self.__bigquery_client.load_table_from_file(
+            localFile,
+            datasetRef.table(tableId),
+            job_config=job_config
+        )
+        return load_job.result()
+
+    def create_table_from_gcp_file(self, gcpFileURI, datasetId, tableId, writeDisposition='WRITE_APPEND'):
+        datasetRef = self.__bigquery_client.dataset(datasetId)
+        job_config = bigquery.LoadJobConfig()
+        job_config.autodetect = True
+        job_config.write_disposition = writeDisposition
+        job_config.source_format = bigquery.SourceFormat.NEWLINE_DELIMITED_JSON
+        load_job = self.__bigquery_client.load_table_from_uri(
+            gcpFileURI,
+            datasetRef.table(tableId),
+            job_config=job_config
+        )
+        return load_job.result()
+
     def execute_query(self, query):
         query_job = self.__bigquery_client.query(query)
         result = query_job.result()
         return result
 
-    def execute_query_to_df(self, query):
+    def execute_query_to_df(self, query, fillna=''):
         query_job = self.__bigquery_client.query(query)
-        ret_df = query_job.result().to_dataframe().fillna('')
+        ret_df = query_job.result().to_dataframe().fillna(fillna)
         return ret_df
 
     def execute_query_with_schema_and_target(self, query, targetDataset, targetTable, schemaDataset=None, schemaTable=None):
