@@ -6,7 +6,7 @@ from datetime import datetime as dt,timedelta
 
 
 def combine_files():
-    os.chdir("/Users/ysherman/Documents/GitHub/results/Finance/daily-quotes")
+    os.chdir("/Users/ysherman/Documents/GitHub/results/Finance/EODHistoricalData/daily-quotes/2019-08-25")
     extension = 'csv'
     all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
 
@@ -16,6 +16,8 @@ def combine_files():
     mydialect.quotechar = '|'
 
     count = 0
+    lineCount=0
+    volumeDict = {}
     main_start_time = dt.now()
     outfile = open('../daily-quotes-agg.csv', 'w')
     outFileWriter = csv.writer(outfile, delimiter=',', dialect=mydialect)
@@ -28,12 +30,22 @@ def combine_files():
             if firstrow and not firstTime:
                 firstrow = False
                 continue
-            outFileWriter.writerow(line[1:])
+            if line[6].find('.')>=0:
+                line[6] = int(float(line[6]))
+                symbol = line[7]
+                if symbol in volumeDict.keys():
+                    volumeDict[symbol] +=1
+                else:
+                    volumeDict[symbol] = 1
+                    print(symbol)
+            outFileWriter.writerow(line)
+            lineCount+=1
         count += 1
         firstTime = False
-        if count % 100 == 0:
-            print('Done writing: {} of {} Total-delta: {}\n'.format(count, len(all_filenames),
+        if count % 1000 == 0:
+            print('Done writing: {} of {}, lines: {}, Total-delta: {}\n'.format(count, len(all_filenames), lineCount,
                                                                     dt.now() - main_start_time))
+    print('Done {}, lines: {}, {}'.format(count, lineCount, volumeDict))
 
 def files_by_date():
     os.chdir("/Users/ysherman/Documents/GitHub/results/Finance/daily-quotes")
@@ -100,6 +112,7 @@ def upload_files():
 
 
 def test():
-    upload_files()
+    combine_files()
+
 
 test()
