@@ -9,7 +9,7 @@ class InsightsPackaging:
     def __init__(self, root='.'):
         self.icm = icm.InsightsConfigurationManager()
         self.bqUtils = bqu.BigqueryUtils()
-        self.questionsReaderQuery = open(root + '/Queries/QuestionsReaderQuery.sql', 'r').read()
+        self.questionsReaderQuery = open(root + '/Queries/SportQuestionsReaderQuery.sql', 'r').read()
 
     def two_answers_reader(self, contentConfigCode):
         configDef = self.icm.get_content_config(contentConfigCode)

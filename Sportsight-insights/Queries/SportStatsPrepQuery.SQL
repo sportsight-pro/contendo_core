@@ -4,7 +4,7 @@ WITH
     QuestionCode,
     StatName AS StatCode,
     StatObject AS StatObjects,
-    SeasonCodes,
+    SeasonCode as SeasonCodes,
     StatTimeframes,
     Question2Objects,
     startSlot,

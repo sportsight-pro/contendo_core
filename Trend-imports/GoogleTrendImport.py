@@ -40,7 +40,7 @@ class GoogleTrendImport:
                         sleeptime += 60
 
             if itemTrend.shape[0] != 90:
-                display('No trend for player')
+                print('No trend for {}'.format(item))
                 continue
 
             itemTrend['Date'] = itemTrend.index
@@ -70,11 +70,11 @@ def test():
     gtrend = GoogleTrendImport()
     itemsDict = bqu.execute_query_to_dict(query)
     print('Getting {} items for finance'.format(itemsDict['nRows']))
-    filename = gtrend.get_trend_for_list(itemsDict['Rows'], 'Code', 7, 'Finance')
+    filename = gtrend.get_trend_for_list(itemsDict['Rows'], 'Code', 1163, 'Financial-Markets')
     #return
     datasetId = 'Trends_Data'
     bqu.create_dataset(datasetId)
-    bqu.create_table_from_local_file(filename, datasetId, 'trends_v1', writeDisposition='WRITE_TRUNCATE')
+    bqu.create_table_from_local_file(filename, datasetId, 'daily_trends', writeDisposition='WRITE_APPEND')
     'Done'
 
 test()

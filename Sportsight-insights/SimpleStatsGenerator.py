@@ -157,7 +157,7 @@ class SimpleStatsGenerator():
 
             #print('Metric: {}, Sport:{}, Delta time: {}'.format(statDef['StatName'], statDef['SportCode'], dt.now() - startTime), flush=True)
 
-            for statObject in statDef['StatObject'].split(','):
+            for statObject in statDef['StatObject'].split(',')[:1]:
                 for rollingDays in statDef['RollingDaysList'].split(','):
                     _statDef = statDef.copy()
                     _statDef['StatObject'] = statObject
@@ -425,4 +425,4 @@ def test():
     #print(generator.days_range(30,1))
     #generator.imdbQuestionsDefGenerator()
 
-#test()
+test()

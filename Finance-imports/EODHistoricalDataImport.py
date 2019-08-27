@@ -29,7 +29,7 @@ class EODHistoricalDataImport(ProducerConsumersEngine.ProducerConsumersEngine):
             os.mkdir(csv_dir)
         #datesPD = self.bqu.execute_query_to_df ("SELECT distinct format_date('%Y-%m-%d', timestamp) as Date FROM `sportsight-tests.Finance_Data.daily_stock_history_*` where timestamp<=parse_date('%x', '09/25/18') order by Date desc limit 230")
         #datesList = list(datesPD['Date'])
-        datesList = ['2019-08-24'] #list(datesPD['Date'])
+        datesList = ['2019-08-23'] #list(datesPD['Date'])
         for date in datesList:
             dailyDF = pd.DataFrame()
             for exchange in ['COMM', 'INDX', 'NASDAQ', 'NYSE']:
@@ -222,7 +222,7 @@ def test():
     #ehd.import_daily_quotes([], startTime)
     #date = '2019-08-20'
     #ehd.get_eod_daily_bulk(startTime)
-    ehd.get_fundamentals_data(startTime)
+    #ehd.get_fundamentals_data(startTime)
     #ehd.create_dated_quote_files('2019-08-21')
     #ehd.upload_dated_quote_files('20190820')
     'Done'

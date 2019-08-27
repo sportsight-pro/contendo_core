@@ -3,16 +3,21 @@ import BigqueryUtils as bqu
 
 import InsightsConfigurationManager as icm
 
-
 class InsightsGenerator:
     def __init__(self, root='.'):
         self.root = root
         self.icm = icm.InsightsConfigurationManager()
-        self.statsPrepQuery = open(root + '/Queries/StatsPrepQuery.sql', 'r').read()
-        self.twoAnswersQuestionQuery = open(root + '/Queries/TwoAnswersQuestionQuery.sql', 'r').read()
-        self.questionsReaderQuery = open(root + '/Queries/QuestionsReaderQuery.sql', 'r').read()
+        self.queryDict = {}
         self.bqUtils = bqu.BigqueryUtils()
         self.TRUE=True
+
+    def get_query(self, domain):
+        if domain not in self.queryDict:
+            statsPrepQuery = open(self.root + '/Queries/{StatsPrepQuery}'.format(**self.icm.domainsDict[domain]), 'r').read()
+            twoAnswersQuestionQuery = open(self.root + '/Queries/{TwoAnswersQuestionQuery}'.format(**self.icm.domainsDict[domain]), 'r').read()
+            self.queryDict[domain] = '{},\n{}\nSELECT * from twoQuestionsFinal'.format(statsPrepQuery, twoAnswersQuestionQuery)
+        #print(self.queryDict[domain])
+        return self.queryDict[domain]
 
     def get_dataset_and_table(self, contentConfigCode):
         return 'temp', 'questions_'+contentConfigCode
@@ -64,12 +69,16 @@ class InsightsGenerator:
         instructions['InsightsConfigurationTable'] =  configTableId
         instructions['StatFilter'] =  self.calc_filter(instructions['StatFilter'])
         instructions['QuestionsFilter'] =  self.calc_filter(instructions['QuestionsFilter'])
-        query ='{},\n{}\nSELECT * from twoQuestionsFinal'.format(self.statsPrepQuery, self.twoAnswersQuestionQuery)
+        query = self.get_query(instructions['SportCode'])
         query = pu.ProUtils.format_string(query, instructions)
         #print("Running query:\n" + query, flush=True)
         #
         # Execute the query.
         dataset_id, table_id = self.get_dataset_and_table(contentConfigCode)
+        queryFile = 'results/queries/{}.sql'.format(table_id)
+        f = open(queryFile, 'w')
+        f.write(query)
+        f.close()
         nQuestions = self.bqUtils.execute_query_with_schema_and_target(query, dataset_id, table_id)
         return nQuestions
 
@@ -77,18 +86,18 @@ class InsightsGenerator:
 def test():
     import os
     from datetime import datetime as dt
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="../../sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
     startTime = dt.now()
     root = os.getcwd()
     ig = InsightsGenerator(root)
-    print(ig.trend_teams_filter(10,1))
-    return
+    #print(ig.trend_teams_filter(10,1))
+    #return
+    os.chdir('/Users/ysherman/Documents/GitHub/')
 
     print('Created insightsGenerator, delta time: {}'.format(dt.now()-startTime))
-    for configCode in ['MLB_2017_Playoff']: #ig.icm.contentConfigDict.keys():
+    for configCode in ['Finance_All']: #ig.icm.contentConfigDict.keys():
         print('Starting: ' + configCode)
         nQuestions = ig.two_answers_generator(configCode)
         print('Done, created {} questions. delta time: {}'.format(nQuestions, dt.now()-startTime))
 
-
-#test()
+test()
