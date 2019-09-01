@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from datetime import datetime as dt, timedelta
+from datetime import datetime as dt, timedelta, date
 import time
 import re
 import glob
@@ -29,28 +29,44 @@ class EODHistoricalDataImport(ProducerConsumersEngine.ProducerConsumersEngine):
             os.mkdir(csv_dir)
         #datesPD = self.bqu.execute_query_to_df ("SELECT distinct format_date('%Y-%m-%d', timestamp) as Date FROM `sportsight-tests.Finance_Data.daily_stock_history_*` where timestamp<=parse_date('%x', '09/25/18') order by Date desc limit 230")
         #datesList = list(datesPD['Date'])
-        datesList = ['2019-08-23'] #list(datesPD['Date'])
-        for date in datesList:
+        datesList = ['2019-08-30'] #list(datesPD['Date'])
+        for stockDate in datesList:
             dailyDF = pd.DataFrame()
             for exchange in ['COMM', 'INDX', 'NASDAQ', 'NYSE']:
-                url = self.EOD_DAYBULK_URL.format(exchange, date)
+                url = self.EOD_DAYBULK_URL.format(exchange, stockDate)
                 print(url, dt.now()-startTime)
                 try:
-                    stockDF = pd.read_csv(url).fillna(0)[['Code', 'Name', 'Date', 'MarketCapitalization', 'Open', 'High', 'Low', 'Close', 'Adjusted_close', 'Volume', 'EMA_50', 'EMA_200', 'High_250', 'Low_250', 'Prev_close', 'Change']][:-1]
+                    stockDF = pd.read_csv(url).fillna(0)[['Date', 'Open', 'High', 'Low', 'Close', 'Adjusted_close', 'Volume', 'Code']][:-1]
                     #print(stockDF.shape, stockDF.columns)
+                    stockDF.rename(columns={'Code': 'Symbol'}, inplace = True)
                     stockDF['Exchange'] = exchange
-                    stockDF.to_csv(csv_dir+'{}-{}.csv'.format(date, exchange))
+                    #dtd = dt.strptime(stockDate, '%Y-%m-%d')
+                    #print(dtd, type(dtd))
+                    #finalDate = dtd.date()
+                    #print(finalDate, type(finalDate))
+                    #builtDate = dt.date(dtd.year, dtd.month, dtd.day)
+                    #print(builtDate, type(builtDate))
+                    #stockDF['Date'] = date(2019,8,25)
+                    stockDF['Volume'] = stockDF['Volume'].astype(int)
+                    stockDF.to_csv(csv_dir+'{}-{}.csv'.format(stockDate, exchange), index=False)
                     dailyDF = dailyDF.append(stockDF)
                 except Exception as e:
                     print("Error {}".format(e))
                 #break
-            tableId = 'Finance_Data.eod_history_data_{}'.format(date.replace('-', ''))
-
+            #tableId = 'Finance_Data.eod_history_data_{}'.format(date.replace('-', ''))
             if dailyDF.shape[0]>0:
+                datasetId = 'Finance_Data'
+                tableId = 'eod_daily_history_1year'
+                delQuery = "delete from `{}.{}` where Date=PARSE_DATE('%Y-%m-%d', '{}')".format(datasetId, tableId, stockDate)
+                #print(delQuery)
+                #print(schema)
+                self.bqu.execute_query(delQuery)
                 print('Writing table {}, size {}, delta time {}'.format(tableId, dailyDF.shape, dt.now() - startTime))
+                schema = self.bqu.get_table_schema(datasetId, tableId)
                 dailyDF.to_gbq(
-                    tableId,
-                    if_exists='replace'
+                    '{}.{}'.format(datasetId, tableId),
+                    table_schema=schema,
+                    if_exists='append'
                 )
 
             #break
@@ -221,8 +237,8 @@ def test():
     #ehd.run(numExecutors=2)
     #ehd.import_daily_quotes([], startTime)
     #date = '2019-08-20'
-    #ehd.get_eod_daily_bulk(startTime)
-    #ehd.get_fundamentals_data(startTime)
+    ehd.get_eod_daily_bulk(startTime)
+    ehd.get_fundamentals_data(startTime)
     #ehd.create_dated_quote_files('2019-08-21')
     #ehd.upload_dated_quote_files('20190820')
     'Done'

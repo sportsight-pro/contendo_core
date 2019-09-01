@@ -390,7 +390,6 @@ class SimpleStatsGenerator():
 
         if numExecutors==0:
             numExecutors = multiprocessing.cpu_count() * 8
-
         producer = multiprocessing.Process(name='QueriesGenerator',
                                            target=self.queriesGenerator,
                                            args=(queriesQueue, numExecutors,),

@@ -25,7 +25,8 @@ class InsightsConfigurationManager:
         config_url = self.configsheet_url.format(**contentConfig)
         #print (config_url)
         insightConfig_df = pd.read_csv(config_url).fillna('')
-        configKeys = ['SeasonCodes', 'SportCode', 'NumSlots', 'StatTimeframes']
+        print (pu.ProUtils.pandas_df_to_dict(insightConfig_df, 'QuestionCode'))
+        configKeys = ['SeasonCode', 'SportCode', 'NumSlots', 'StatTimeframes', 'ListDescription']
         for key in configKeys:
             if key in contentConfig.keys():
                 insightConfig_df[key] = contentConfig[key]
@@ -48,4 +49,4 @@ def test():
     #tableId = icm.save_configuration_to_bigquery('IMDB_All')
     #print('Done ' + tableId)
 
-#test()
+test()

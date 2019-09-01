@@ -1,56 +1,59 @@
 WITH
   base_data_filtered AS (
   SELECT
-    base.*,
-    sym.Type,
+    base.Symbol,
     sym.Name,
-    fundamentals.General.Sector,
-    fundamentals.Highlights.MarketCapitalizationMln AS MarketCap
-  FROM
-    `sportsight-tests.Finance_Data.eod_daily_history_2019` base
-  LEFT JOIN
-    `sportsight-tests.Finance_Data.eod_exchange_symbols_list` sym
-  ON
-    base.Symbol=sym.Code and base.Exchange=sym.Exchange
-  LEFT JOIN
-    `sportsight-tests.Finance_Data.fundamentals_daily_` fundamentals
-  ON
-    base.Symbol=fundamentals.General.Code and base.Exchange=fundamentals.General.Exchange
-
-  WHERE
-    #_TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH)) and FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 0 DAY))
-    Date BETWEEN DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH) and DATE_SUB(CURRENT_DATE(), INTERVAL 0 DAY)
-    AND ((sym.Type in ('Common Stock', 'Commodity') or sym.Type='INDEX' and sym.Code in ('GSPC', 'DJI', 'VIX')))
-  ),
-  history_data AS (
-  SELECT
-    '{StatName}' AS StatName,
-    FORMAT('%s.%s', Symbol, Exchange) as Code,
-    Symbol,
-    Name,
-    Sector,
-    Exchange,
-    Type,
-    MarketCap,
-    Date,
+    FORMAT('%s.%s', base.Symbol, base.Exchange) as Code,
+    sym.Type,
+    comp.Sector,
+    comp.TrendValue,
+    comp.isDJI,
+    comp.isSNP,
+    base.Exchange,
+    base.Date,
     if(open=0, NULL, open) as open,
     if(high=0, NULL, high) as high,
     if(low=0, NULL, low) as low,
     if(close=0, NULL, close) as close,
     if(Adjusted_close=0, NULL, Adjusted_close) as adjClose,
-    volume
+    volume,
+    comp.MarketCapitalizationMln AS MarketCap
+  FROM
+    `sportsight-tests.Finance_Data.eod_daily_history_1year` base
+  LEFT JOIN
+    `sportsight-tests.Finance_Data.eod_exchange_symbols_list` sym
+  ON
+    base.Symbol=sym.Code and base.Exchange=sym.Exchange
+  LEFT JOIN
+    `sportsight-tests.Finance_Data.all_company_data` comp
+  ON
+    base.Symbol=comp.Symbol and base.Exchange=comp.Exchange
+
+  WHERE
+    TRUE
+    #_TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH)) and FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 0 DAY))
+    #AND Date BETWEEN DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH) and DATE_SUB(CURRENT_DATE(), INTERVAL 0 DAY)
+    AND ((sym.Type in ('Common Stock', 'Commodity') or sym.Type='INDEX' and sym.Code in ('GSPC', 'DJI', 'VIX')))
+  ),
+  history_data AS (
+  SELECT
+    '{StatName}' AS StatName,
+    *,
+    LAG(adjClose) OVER (PARTITION BY code ORDER BY date) prevAdjClose
+
   FROM
     base_data_filtered),
-  ytd AS (
+  first_close_since AS (
   SELECT
-    FIRST_VALUE(adjClose) OVER (PARTITION BY code ORDER BY date) ytdClose,
+    FIRST_VALUE(prevAdjClose) OVER (PARTITION BY code ORDER BY date) firstClose,
     code,
     date
   FROM
     history_data hd
   WHERE
-    Date>='2018-12-31'
-    and adjClose IS NOT NULL),
+    TRUE
+    AND {DateCondition}
+    AND adjClose IS NOT NULL),
   first_calc AS (
   SELECT
     *,  
@@ -77,6 +80,8 @@ SELECT
   Symbol,
   Sector,
   Exchange,
+  isDJI,
+  isSNP,
   Type,
   Name,
   MarketCap,
@@ -87,7 +92,8 @@ SELECT
   close,
   adjClose,
   volume,
-  StatName
+  StatName,
+  FORMAT('%s (%s)', Name, Symbol) AS ObjectName,
   {Stat} as StatValue,
   DENSE_RANK() OVER (PARTITION BY StatName ORDER BY StatName DESC) AS DenseRank
 FROM

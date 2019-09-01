@@ -10,7 +10,8 @@ class GoogleTrendImport:
 
     def get_trend_for_list(self, itemList, key, category, categoryName):
         startTime = dt.now()
-        filename = 'trends_{}_{}_{}.json'.format(categoryName, category, startTime.strftime('%Y%m%dT5H%M%S'))
+        filename = 'trends_{}_{}_{}.json'.format(categoryName, category, startTime.strftime('%Y%m%dTH%M%S'))
+        todayDate = startTime.strftime('%Y-%m-%d')
         outfile = open(filename, 'w')
         # pytrends = TrendReq(hl='en-US', tz=360, proxies=['https://34.203.233.13:80', 'https://35.201.123.31:880'])
 
@@ -39,8 +40,8 @@ class GoogleTrendImport:
                     if str(e).find('429') >= 0:
                         sleeptime += 60
 
-            if itemTrend.shape[0] != 90:
-                print('No trend for {}'.format(item))
+            if itemTrend.shape[0] < 85:
+                print('No trend for {}'.format(item), itemTrend.shape)
                 continue
 
             itemTrend['Date'] = itemTrend.index
@@ -50,7 +51,7 @@ class GoogleTrendImport:
                 trend['Trend'] = row[item]
                 trend['Date'] = row['Date'].strftime('%Y-%m-%d')
                 trends.append(trend)
-            trendsDict = {'ItemTrend': trends, 'CategoryId': category, 'CategoryName': categoryName}
+            trendsDict = {'ItemTrend': trends, 'CategoryId': category, 'CategoryName': categoryName, 'SampleDate': todayDate}
             trendsDict.update(itemDict)
             trendsDict.pop('count')
             #print(trendsDict)
@@ -70,11 +71,12 @@ def test():
     gtrend = GoogleTrendImport()
     itemsDict = bqu.execute_query_to_dict(query)
     print('Getting {} items for finance'.format(itemsDict['nRows']))
-    filename = gtrend.get_trend_for_list(itemsDict['Rows'], 'Code', 1163, 'Financial-Markets')
-    #return
-    datasetId = 'Trends_Data'
-    bqu.create_dataset(datasetId)
-    bqu.create_table_from_local_file(filename, datasetId, 'daily_trends', writeDisposition='WRITE_APPEND')
+    trendsDict = {'Finance': 7, 'Financial-Markets': 1163}
+    for categoryName, category in trendsDict.items():
+        filename = gtrend.get_trend_for_list(itemsDict['Rows'], 'Code', category, categoryName)
+        datasetId = 'Trends_Data'
+        bqu.create_dataset(datasetId)
+        bqu.create_table_from_local_file(filename, datasetId, 'daily_trends', writeDisposition='WRITE_APPEND')
     'Done'
 
 test()

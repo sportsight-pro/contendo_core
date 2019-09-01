@@ -53,6 +53,18 @@ class BigqueryUtils:
         fileObj.close()
         return load_job.result()
 
+    def get_table_schema(self, datasetId, tableId):
+
+        datasetRef = self.__bigquery_client.dataset(datasetId)
+        tableRef = datasetRef.table(tableId)
+        table = self.__bigquery_client.get_table(tableRef)  # API Request
+
+        schema = []
+        for schemaField in table.schema:
+            schema.append(schemaField.to_api_repr())
+
+        return schema
+
     def execute_query(self, query):
         query_job = self.__bigquery_client.query(query)
         result = query_job.result()

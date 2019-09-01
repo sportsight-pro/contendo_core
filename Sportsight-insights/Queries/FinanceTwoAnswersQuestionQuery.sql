@@ -29,12 +29,14 @@ twoQuestions AS (
     AND s1.StatObject = s2.StatObject
     AND s1.StatRollingDays = s2.StatRollingDays
     AND s1.StatDate = s2.StatDate
+    AND s1.Type = s2.Type
   WHERE
     # match was not found
     s2.StatName IS NOT NULL
     #
     # Filter out questions with
-    AND (ABS(s2.StatValue-s2.minValue+1)/(s2.valueRange) > 0.1 OR s2.numRanks<6) ),
+    #AND (ABS(s2.StatValue-s2.minValue)/(s2.valueRange) > 0.1 OR s2.numRanks<6)
+    ),
   twoQuestionsNumbered AS (
   SELECT
     #ROW_NUMBER() OVER () AS rowNum,

@@ -112,7 +112,20 @@ def upload_files():
 
 
 def test():
-    combine_files()
+    #combine_files()
+    import EODHistoricalDataImport
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
+    startTime = dt.now()
+
+    ehd = EODHistoricalDataImport.EODHistoricalDataImport()
+    #ehd.run(numExecutors=2)
+    #ehd.import_daily_quotes([], startTime)
+    #date = '2019-08-20'
+    ehd.get_eod_daily_bulk(startTime)
+    #ehd.get_fundamentals_data(startTime)
+    #ehd.create_dated_quote_files('2019-08-21')
+    #ehd.upload_dated_quote_files('20190820')
+    'Done'
 
 
 test()

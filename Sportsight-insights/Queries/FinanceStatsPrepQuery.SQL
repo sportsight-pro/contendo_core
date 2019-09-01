@@ -4,6 +4,7 @@ WITH
     QuestionCode,
     StatName AS StatCode,
     StatObject AS StatObjects,
+    RollingDays,
     Question2Objects,
     startSlot,
     Value1Template,
@@ -21,6 +22,7 @@ WITH
     COUNT(*) OVER (PARTITION BY StatObject, StatRollingDays, StatDate, QuestionCode) AS objectsCount,
     MIN(StatValue) OVER (PARTITION BY StatObject, StatRollingDays, StatDate, QuestionCode) AS minValue,
     MAX(StatValue) OVER (PARTITION BY StatObject, StatRollingDays, StatDate, QuestionCode) AS maxValue,
+    MAX(StatDate) OVER (PARTITION BY StatObject, StatRollingDays, QuestionCode) AS maxDate,
     CASE
       WHEN StatObject='Sector' THEN Sector
       WHEN StatObject='Stock' THEN FORMAT("%s (%s)", Name, Symbol)
@@ -37,10 +39,10 @@ WITH
   WHERE
     TRUE
     AND {StatFilter}
-    #AND TeamCode IS NOT NULL
-    #AND PlayerCode IS NOT NULL
-    AND StatValue>0
-    AND STRPOS(StatObjects, StatObject) > 0),
+    #AND StatValue>0
+    AND STRPOS(StatObjects, StatObject) > 0
+    AND STRPOS(RollingDays, StatRollingDays) > 0
+  ),
   insightStats_valrange AS (
   SELECT
     COUNT(*) OVER (PARTITION BY StatObject, StatRollingDays, StatDate, QuestionCode, internalDenseRank) AS rankItemsCount,
@@ -50,6 +52,7 @@ WITH
     insightStats
   WHERE
     maxValue-minValue>0
+    AND StatDate=maxDate
     AND internalRank < {MaxItems}
     ),
   insightStats_numranks AS (
