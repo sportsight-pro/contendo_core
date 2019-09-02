@@ -1,12 +1,6 @@
-import flask
-import pytest
+#import flask
+#import pytest
 from unittest.mock import Mock
-import GetListsFunction
-
-# Create a fake "app" for generating test request contexts.
-@pytest.fixture(scope="module")
-def app():
-    return flask.Flask(__name__)
 
 def test_getlists_args():
     testDict = {}
@@ -18,7 +12,7 @@ def test_getlists_args():
 
     req = Mock(get_json=Mock(return_value=testDict), args=testDict)
 
-    res = GetListsFunction.get_top_lists(req)
+    res = get_top_lists(req)
     print(res)
     assert 'Error' not in res
 
@@ -32,11 +26,14 @@ def test_getlists_json():
 
     req = Mock(get_json=Mock(return_value=testDict), json=testDict)
 
-    res = GetListsFunction.get_top_lists(req)
+    res = get_top_lists(req)
     print(res)
     assert 'Error' not in res
 
 import os
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
+print(os.getcwd())
+os.chdir('functions/get_top_lists')
+from functions.get_top_lists.main import get_top_lists
 test_getlists_args()
 #test_getlists_json()

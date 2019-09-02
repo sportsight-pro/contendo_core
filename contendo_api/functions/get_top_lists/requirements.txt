@@ -1,5 +1,7 @@
 # Function dependencies, for example:
 # package>=version
 google-cloud-bigquery
+google-cloud-storage
 google-cloud-error-reporting
 pandas
+contendo_utils>=0.2
