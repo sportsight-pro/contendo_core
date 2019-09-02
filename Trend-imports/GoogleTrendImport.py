@@ -60,13 +60,14 @@ class GoogleTrendImport:
         outfile.close()
         return filename
 
-import BigqueryUtils
+from contendo_utils import BigqueryUtils
 import os
+
 def test():
     os.chdir('/Users/ysherman/Documents/GitHub/results/trends')
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
     query = 'SELECT Code, Name, Sector, count(*) count FROM `sportsight-tests.Finance_Data.indices_company_list` left join unnest(Components) group by 1,2,3 having count>0 order by count desc, name'
-    bqu = BigqueryUtils.BigqueryUtils()
+    bqu = BigqueryUtils()
 
     gtrend = GoogleTrendImport()
     itemsDict = bqu.execute_query_to_dict(query)

@@ -3,8 +3,8 @@ import os
 import multiprocessing
 import time
 import pandas as pd
-import BigqueryUtils as bqu
-import ProUtils as pu
+from contendo_utils import BigqueryUtils
+from contendo_utils import ProUtils
 
 definitions = {
     'SeasonStats': {
@@ -39,20 +39,20 @@ class SimpleStatsGenerator():
         self.configsheet_url = 'https://docs.google.com/spreadsheets/d/1gwtQlzk0iA4qyLzqaYEk5SggOqNZtJnSSfwnZYDNlAw/export?format=csv&gid={SheetId}&run=1'
         sourceConfigDF = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,'284194018')).fillna('')
         sourceConfigDF['enriched'] = False
-        self.sourcesConfigDict = pu.ProUtils.pandas_df_to_dict(sourceConfigDF, 'Configname')
+        self.sourcesConfigDict = ProUtils.pandas_df_to_dict(sourceConfigDF, 'Configname')
         self.sport_configs = {}
         self.TRUE = True
 
         #
         # read IMDB title definitions
         titleTypesDF = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,'1802180540')).fillna('')
-        self.titletypesConfigDict = pu.ProUtils.pandas_df_to_dict(titleTypesDF, 'TitleType')
+        self.titletypesConfigDict = ProUtils.pandas_df_to_dict(titleTypesDF, 'TitleType')
 
         #print(sourceConfig)
 
         self.consumerStatus = multiprocessing.Queue()
         self.sentinel = 'Done'
-        self.bqUtils = bqu.BigqueryUtils()
+        self.bqUtils = BigqueryUtils()
 
     def get_source_configuration(self, configName):
         sourceConfig = self.sourcesConfigDict[configName]
@@ -66,7 +66,7 @@ class SimpleStatsGenerator():
             self.sport_configs[sheetId] = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,str(sourceConfig['SportSheetId']))).fillna('')
             self.sport_configs[sheetId]['SportCode'] = sourceConfig['SportCode']
 
-        sourceConfig['StatsDefDict'] = pu.ProUtils.pandas_df_to_dict(self.sport_configs[sheetId], 'StatName')
+        sourceConfig['StatsDefDict'] = ProUtils.pandas_df_to_dict(self.sport_configs[sheetId], 'StatName')
 
         if 'query' not in sourceConfig.keys():
             sourceConfig['query'] = open(self.root + '/Queries/' + sourceConfig['QueryFile'], 'r').read()
@@ -163,9 +163,9 @@ class SimpleStatsGenerator():
                     _statDef['StatObject'] = statObject
                     rollingDaysInst = {'RollingDays': rollingDays}
                     query = sourceConfig['query']
-                    query=pu.ProUtils.format_string(query, _statDef)
-                    query=pu.ProUtils.format_string(query, sourceConfig)
-                    query=pu.ProUtils.format_string(query, rollingDaysInst)
+                    query=ProUtils.format_string(query, _statDef)
+                    query=ProUtils.format_string(query, sourceConfig)
+                    query=ProUtils.format_string(query, rollingDaysInst)
                     #print (query)
                     #
                     # define the destination table
@@ -173,7 +173,7 @@ class SimpleStatsGenerator():
                     instructions['StatTimeframe'] = sourceConfig['StatTimeframe']
                     instructions['StatSource'] = sourceConfig['StatSource']
                     instructions['RollingDays'] = rollingDays
-                    targetTable = pu.ProUtils.format_string(financeTableFormat, instructions).replace('.', '_').replace('-', '_')
+                    targetTable = ProUtils.format_string(financeTableFormat, instructions).replace('.', '_').replace('-', '_')
                     jobDefinition = {
                         'params': {
                             'query': query,
@@ -215,16 +215,16 @@ class SimpleStatsGenerator():
                     _statDef['TitleType'] = titleType
                     _statDef['Genre'] = genre
                     _statDef['StatObject'] = titleType
-                    query=pu.ProUtils.format_string(query, _statDef)
-                    query=pu.ProUtils.format_string(query, sourceConfig)
-                    query=pu.ProUtils.format_string(query, titletypeConfig)
+                    query=ProUtils.format_string(query, _statDef)
+                    query=ProUtils.format_string(query, sourceConfig)
+                    query=ProUtils.format_string(query, titletypeConfig)
                     #print (query)
                     #
                     # define the destination table
                     instructions = _statDef
                     instructions['StatTimeframe'] = sourceConfig['StatTimeframe']
                     instructions['StatSource'] = sourceConfig['StatSource']
-                    targetTable = pu.ProUtils.format_string(targetTableFormat, instructions).replace('.', '_').replace('-', '_')
+                    targetTable = ProUtils.format_string(targetTableFormat, instructions).replace('.', '_').replace('-', '_')
                     jobDefinition = {
                         'params': {
                             'query': query,
@@ -270,7 +270,7 @@ class SimpleStatsGenerator():
                         questionDef['StatName'] = '{}.{}'.format(questionDef['StatName'], genre)
                         questionDef['Genre'] = genre+' '
 
-                    questionDef['Question2Objects'] = pu.ProUtils.format_string(statDef['Question2Objects'], questionDef)
+                    questionDef['Question2Objects'] = ProUtils.format_string(statDef['Question2Objects'], questionDef)
                     questionsList.append(questionDef)
 
         keys = ['QuestionCode', 'StatName', 'Genre', 'Level', 'ObjectDisplayName', 'Question2Objects',
@@ -284,7 +284,7 @@ class SimpleStatsGenerator():
         endDate = (dt.today()-timedelta(days=prev))
         condTemplate = '{DateProperty} BETWEEN "{StartDate}" and "{EndDate}"'
         condInst = {'StartDate': startDate.strftime('%Y%m%d'), 'EndDate': endDate.strftime('%Y%m%d')}
-        instructions['StatCondition'] = pu.ProUtils.format_string(condTemplate, condInst)
+        instructions['StatCondition'] = ProUtils.format_string(condTemplate, condInst)
         instructions['DaysRange'] = '{}...{}'.format(startDate.strftime('%Y-%m-%d'), endDate.strftime('%Y-%m-%d'))
         return instructions
 
@@ -294,7 +294,7 @@ class SimpleStatsGenerator():
         endDate = (dt.today()-timedelta(days=prev))
         condTemplate = '{DateProperty} BETWEEN "{StartDate}" and "{EndDate}"'
         condInst = {'StartDate': startDate.strftime('%Y%m%d'), 'EndDate': endDate.strftime('%Y%m%d')}
-        instructions['StatCondition'] = pu.ProUtils.format_string(condTemplate, condInst)
+        instructions['StatCondition'] = ProUtils.format_string(condTemplate, condInst)
         instructions['DaysRange'] = 'N/A'
         return instructions
 
@@ -316,13 +316,13 @@ class SimpleStatsGenerator():
                     query = query.replace('{StatObject}', statObject)
                     query = query.replace('{StatTimeframe}', statTimeframe)
                     if sourceConfig['StatCondition'] != '':
-                        query = pu.ProUtils.format_string(query, eval("self."+sourceConfig['StatCondition']))
+                        query = ProUtils.format_string(query, eval("self."+sourceConfig['StatCondition']))
                     else:
-                        query = pu.ProUtils.format_string(query, {'StatCondition': True})
+                        query = ProUtils.format_string(query, {'StatCondition': True})
 
-                    query = pu.ProUtils.format_string(query, sourceDefinitions['StatObject'][statObject])
-                    query=pu.ProUtils.format_string(query, statDef)
-                    query=pu.ProUtils.format_string(query, sourceConfig)
+                    query = ProUtils.format_string(query, sourceDefinitions['StatObject'][statObject])
+                    query=ProUtils.format_string(query, statDef)
+                    query=ProUtils.format_string(query, sourceConfig)
                     #print (query)
                     #
                     # define the destination table
@@ -330,7 +330,7 @@ class SimpleStatsGenerator():
                     instructions['StatObject'] = statObject
                     instructions['StatTimeframe'] = statTimeframe
                     instructions['StatSource'] = sourceConfig['StatSource']
-                    targetTable = pu.ProUtils.format_string(targetTableFormat, instructions).replace('.', '_')
+                    targetTable = ProUtils.format_string(targetTableFormat, instructions).replace('.', '_')
                     jobDefinition = {
                         'params': {
                             'query': query,
@@ -353,14 +353,14 @@ class SimpleStatsGenerator():
 
             #print('Metric: {}, Sport:{}, Delta time: {}'.format(statDef['StatName'], statDef['SportCode'], dt.now() - startTime), flush=True)
             inst={}
-            inst ['StatTimeframes'] = pu.ProUtils.commastring_to_liststring(statDef['StatTimeframes'])
-            inst['StatObjects'] = pu.ProUtils.commastring_to_liststring(statDef['StatObjects'])
-            inst['NumeratorStatNames'] = pu.ProUtils.commastring_to_liststring(statDef['NumeratorStatNames'])
-            inst['DenominatorStatNames'] = pu.ProUtils.commastring_to_liststring(statDef['DenominatorStatNames'])
+            inst ['StatTimeframes'] = ProUtils.commastring_to_liststring(statDef['StatTimeframes'])
+            inst['StatObjects'] = ProUtils.commastring_to_liststring(statDef['StatObjects'])
+            inst['NumeratorStatNames'] = ProUtils.commastring_to_liststring(statDef['NumeratorStatNames'])
+            inst['DenominatorStatNames'] = ProUtils.commastring_to_liststring(statDef['DenominatorStatNames'])
             query = sourceConfig['query']
-            query=pu.ProUtils.format_string(query, inst)
-            query=pu.ProUtils.format_string(query, statDef)
-            query=pu.ProUtils.format_string(query, sourceConfig)
+            query=ProUtils.format_string(query, inst)
+            query=ProUtils.format_string(query, statDef)
+            query=ProUtils.format_string(query, sourceConfig)
             #print (query)
             #
             # define the destination table
@@ -368,7 +368,7 @@ class SimpleStatsGenerator():
             instructions['StatObject'] = statDef['StatObjects'].replace(',', '_')
             instructions['StatTimeframe'] = statDef['StatTimeframes'].replace(',', '_')
             instructions['StatSource'] = sourceConfig['StatSource']
-            targetTable = pu.ProUtils.format_string(targetTableFormat, instructions).replace('.', '_')
+            targetTable = ProUtils.format_string(targetTableFormat, instructions).replace('.', '_')
             jobDefinition = {
                 'params': {
                     'query': query,
@@ -420,8 +420,9 @@ def test():
     #generator.run()
     #generator.run(configurations=['Baseball.PBP.Last7Days', 'Baseball.PBP.Last30Days', 'Baseball.PBP.Season'])
     #generator.run(configurations=['Baseball.ComposedStats'], numExecutors=5)
-    generator.run(configurations=['Finance.AlphaVantage'])
+    generator.run(configurations=['Finance.EOD'])
     #print(generator.days_range(30,1))
     #generator.imdbQuestionsDefGenerator()
 
-test()
+if __name__ == '__main__':
+    test()

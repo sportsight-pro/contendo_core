@@ -1,6 +1,6 @@
-import ProUtils as pu
-import BigqueryUtils as bqu
 from datetime import datetime as dt
+from contendo_utils import BigqueryUtils
+from contendo_utils import ProUtils
 
 import InsightsConfigurationManager as icm
 
@@ -9,7 +9,7 @@ class InsightsGenerator:
         self.root = root
         self.icm = icm.InsightsConfigurationManager()
         self.queryDict = {}
-        self.bqu = bqu.BigqueryUtils()
+        self.bqu = BigqueryUtils()
         self.TRUE=True
 
     def get_twoanswers_query(self, domain):
@@ -97,7 +97,7 @@ class InsightsGenerator:
         instructions['StatFilter'] =  self.calc_filter(instructions['StatFilter'])
         instructions['QuestionsFilter'] =  self.calc_filter(instructions['QuestionsFilter'])
         query = self.get_twoanswers_query(instructions['SportCode'])
-        query = pu.ProUtils.format_string(query, instructions)
+        query = ProUtils.format_string(query, instructions)
         #print("Running query:\n" + query, flush=True)
         #
         # Execute the query.
@@ -120,7 +120,7 @@ class InsightsGenerator:
         instructions['StatFilter'] =  self.calc_filter(instructions['StatFilter'])
         instructions['QuestionsFilter'] =  self.calc_filter(instructions['QuestionsFilter'])
         query = self.get_lists_query(instructions['SportCode'])
-        query = pu.ProUtils.format_string(query, instructions)
+        query = ProUtils.format_string(query, instructions)
         #print("Running query:\n" + query, flush=True)
         #
         # Execute the query.
@@ -132,102 +132,6 @@ class InsightsGenerator:
         nItems = self.bqu.execute_query_with_schema_and_target(query, dataset_id, table_id)
         return nItems
 
-    def one_list_generator(self, listConfigDict, startTime=dt.now()):
-        #
-        # read the query, configure and run it.
-        instructions={}
-        if 'StatName' in listConfigDict:
-            instructions['StatName']=listConfigDict['StatName']
-        else:
-            return {'Error': 'StatName parameter must be defined'}
-
-        if 'Sector' in listConfigDict:
-            instructions['SectorCondition']='Sector="{}"'.format(listConfigDict['Sector'])
-        else:
-            instructions['SectorCondition']='TRUE'
-
-        if 'RollingDays' in listConfigDict:
-            instructions['RollingDaysCondition']='StatRollingDays="{}"'.format(listConfigDict['RollingDays'])
-        else:
-            instructions['RollingDaysCondition']='TRUE'
-
-        if 'DJ' in listConfigDict:
-            instructions['DJICondition'] = 'isDJI'
-        else:
-            instructions['DJICondition'] = 'TRUE'
-
-        if 'S&P' in listConfigDict:
-            instructions['SNPCondition'] = 'isSNP'
-        else:
-            instructions['SNPCondition'] = 'TRUE'
-
-        minMarketCap = listConfigDict.get('MarketCapMin', 1000)
-        maxMarketCap = listConfigDict.get('MarketCapMax', 1000000000)
-        instructions['MarketCapCondition'] = 'MarketCap BETWEEN {} AND {}'.format(minMarketCap, maxMarketCap)
-        instructions['ListSize'] = listConfigDict.get('ListSize', 5)
-
-        query = self.get_onelist_query(listConfigDict['Domain'])
-        query = pu.ProUtils.format_string(query, instructions)
-        #print("Running query:\n" + query, flush=True)
-        #return
-        #
-        # Execute the query.
-        print(dt.now()-startTime)
-        listDF = self.bqu.execute_query_to_df(query)
-        print(dt.now()-startTime)
-        print (listDF.columns, listDF.shape)
-        listDict = pu.ProUtils.pandas_df_to_dict(listDF, 'TopRank')
-        return listDict
-
-def one_list_test_http():
-
-    import requests
-    import json
-
-    testDict = {}
-    testDict['Domain'] = 'Finance'
-    testDict['StatName'] = 'Finance.dollarVolume'
-    testDict['DJ'] = 'Anything'
-    testDict['S&P'] = 'Anything'
-    testDict['Sector'] = 'Technology'
-    testDict['MarketCapMin'] = 1000
-    testDict['MarketCapMax'] = 10000000
-    testDict['RollingDays'] = 0
-    testDict['ListSize'] = 5
-    print(testDict)
-    data_json = json.dumps(testDict)
-    payload = {'json_payload': data_json}
-    ret = requests.post("https://us-central1-sportsight-tests.cloudfunctions.net/get_top_lists", data=payload)
-    print(ret.text)
-
-one_list_test_http()
-
-def one_list_test():
-    import os
-    from datetime import datetime as dt
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
-    startTime = dt.now()
-    root = os.getcwd()
-    ig = InsightsGenerator(root)
-    #print(ig.trend_teams_filter(10,1))
-    #return
-    os.chdir('/Users/ysherman/Documents/GitHub/')
-
-    testDict = {}
-    testDict['Domain'] = 'Finance'
-    testDict['StatName'] = 'Finance.dollarVolume'
-    testDict['DJ'] = 'Anything'
-    testDict['S&P'] = 'Anything'
-    testDict['Sector'] = 'Technology'
-    testDict['MarketCapMin'] = 1000
-    testDict['MarketCapMax'] = 10000000
-    testDict['RollingDays'] = 0
-    testDict['ListSize'] = 5
-    print(testDict)
-    ret = ig.one_list_generator(testDict)
-    print(ret)
-
-#one_list_test()
 
 def test():
     import os
@@ -259,5 +163,5 @@ def test():
             print("Error: {}".format(e))
             continue
 
-#test()
-#{"Domain": "Finance", "StatName": "Finance.dollarVolume", "DJ": "Anything", "S&P": "Anything", "Sector": "Technology", "MarketCapMin": 1000, "MarketCapMax": 10000000, "RollingDays": 0, "ListSize": 5}
+if __name__ == '__main__':
+    test()

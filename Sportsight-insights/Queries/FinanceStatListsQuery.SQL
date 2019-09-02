@@ -4,7 +4,7 @@ WITH
     QuestionCode,
     StatName AS StatCode,
     StatObject AS StatObjects,
-    RollingDays,
+    cast (RollingDays as STRING) as RollingDays,
     SentenceRegardingList,
     ListDescription,
     Value1Template
@@ -41,7 +41,7 @@ WITH
     TRUE
     AND {StatFilter}
     AND STRPOS(StatObjects, StatObject) > 0
-    AND STRPOS(RollingDays, StatRollingDays) > 0
+    AND RollingDays = StatRollingDays
   ),
   insightStatsFinal AS (
   SELECT

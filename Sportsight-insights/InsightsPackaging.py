@@ -1,6 +1,6 @@
 from datetime import datetime as dt
-import ProUtils as pu
-import BigqueryUtils as bqu
+from contendo_utils import BigqueryUtils
+from contendo_utils import ProUtils
 import InsightsConfigurationManager as icm
 import pandas as pd
 import random
@@ -8,14 +8,14 @@ import random
 class InsightsPackaging:
     def __init__(self, root='.'):
         self.icm = icm.InsightsConfigurationManager()
-        self.bqUtils = bqu.BigqueryUtils()
+        self.bqUtils = BigqueryUtils()
         self.questionsReaderQuery = open(root + '/Queries/SportQuestionsReaderQuery.sql', 'r').read()
 
     def two_answers_reader(self, contentConfigCode):
         configDef = self.icm.get_content_config(contentConfigCode)
         #
         # read the questions
-        query = pu.ProUtils.format_string(self.questionsReaderQuery, configDef)
+        query = ProUtils.format_string(self.questionsReaderQuery, configDef)
         questionsDF = self.bqUtils.execute_query_to_df(query)
         #
         # find all metrics within slot
@@ -38,7 +38,7 @@ class InsightsPackaging:
         timeFrameTexts = configDef['TimeframeText'].split(',')
         loc = random.randint(0,len(timeFrameTexts)-1)
         questionInstructions['Timeframe'] = timeFrameTexts[loc]
-        questionText = pu.ProUtils.format_string(questionTemplate, questionInstructions)
+        questionText = ProUtils.format_string(questionTemplate, questionInstructions)
         templateDict = self.icm.templateDefsDict
 
         outQuestion = {
@@ -83,10 +83,10 @@ class InsightsPackaging:
             'TeamName', 
             'PlayerName'
         ]
-        pu.ProUtils.update_dict(outQuestion, stat1, questionKeys)
-        pu.ProUtils.update_dict(outQuestion, questionDict, questionKeys)
-        pu.ProUtils.update_dict(outQuestion, stat1, statKeys, '1')
-        pu.ProUtils.update_dict(outQuestion, stat2, statKeys, '2')
+        ProUtils.update_dict(outQuestion, stat1, questionKeys)
+        ProUtils.update_dict(outQuestion, questionDict, questionKeys)
+        ProUtils.update_dict(outQuestion, stat1, statKeys, '1')
+        ProUtils.update_dict(outQuestion, stat2, statKeys, '2')
 
         return outQuestion
 
@@ -143,9 +143,10 @@ def test():
     import InsightsGenerator
 
     #print (os.getcwd())
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="../../sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
     startTime = dt.now()
     root = os.getcwd() #+ '/sportsight-core/Sportsight-insights'
+    os.chdir('/Users/ysherman/Documents/GitHub/')
 
     ig = InsightsGenerator.InsightsGenerator(root=root)
     ip = InsightsPackaging(root=root)
@@ -160,3 +161,6 @@ def test():
         print('Done questions generation, created {} questions. delta time: {}'.format(nQuestions, dt.now()-startTime))
         ip.two_answers_package_generator(configCode)
         print('Done packaging, delta time: {}'.format(dt.now() - startTime))
+
+if __name__ == '__main__':
+    test()

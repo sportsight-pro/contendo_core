@@ -1,31 +1,38 @@
 import pandas as pd
 import os
-import ProUtils as pu
+from contendo_utils import ProUtils
 
 class InsightsConfigurationManager:
 
     def __init__(self):
         self.configsheet_url = 'https://docs.google.com/spreadsheets/d/1hsTL7TzdtwPTBe5ZXs4PN1McQ4h5-NctW_KnV9sZQfo/export?format=csv&gid={SheetId}&run=1'
         contentConfig_df = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,'742083111')).fillna('')
-        self.contentConfigDict = pu.ProUtils.pandas_df_to_dict(contentConfig_df, 'ContentDefCode')
+        self.contentConfigDict = ProUtils.pandas_df_to_dict(contentConfig_df, 'ContentDefCode')
         domainsDF = pd.read_csv(self.configsheet_url.format(SheetId='103209122')).fillna('')
-        self.domainsDict = pu.ProUtils.pandas_df_to_dict(domainsDF, 'Domain')
+        self.domainsDict = ProUtils.pandas_df_to_dict(domainsDF, 'Domain')
         templates_df = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,'2085630088')).fillna('')
-        self.templateDefsDict = pu.ProUtils.pandas_df_to_dict(templates_df, 'TemplateName')
+        self.templateDefsDict = ProUtils.pandas_df_to_dict(templates_df, 'TemplateName')
 
         return
 
     def get_content_config(self, contentConfigCode):
         return self.contentConfigDict[contentConfigCode]
 
+    def get_configuration_dict(self, contentConfigCode):
+        contentConfig = self.contentConfigDict[contentConfigCode]
+        #
+        # Getting the insight-configuration data, setting common configurations and writing to BQ..
+        config_url = self.configsheet_url.format(**contentConfig)
+        insightConfig_df = pd.read_csv(config_url).fillna('')
+        return ProUtils.pandas_df_to_dict(insightConfig_df, 'QuestionCode')
+
     def save_configuration_to_bigquery(self, contentConfigCode):
         contentConfig = self.contentConfigDict[contentConfigCode]
         #
         # Getting the insight-configuration data, setting common configurations and writing to BQ..
         config_url = self.configsheet_url.format(**contentConfig)
-        #print (config_url)
         insightConfig_df = pd.read_csv(config_url).fillna('')
-        print (pu.ProUtils.pandas_df_to_dict(insightConfig_df, 'QuestionCode'))
+        #print (ProUtils.pandas_df_to_dict(insightConfig_df, 'QuestionCode'))
         configKeys = ['SeasonCode', 'SportCode', 'NumSlots', 'StatTimeframes', 'ListDescription']
         for key in configKeys:
             if key in contentConfig.keys():
@@ -49,4 +56,5 @@ def test():
     #tableId = icm.save_configuration_to_bigquery('IMDB_All')
     #print('Done ' + tableId)
 
-test()
+if __name__ == '__main__':
+    test()
