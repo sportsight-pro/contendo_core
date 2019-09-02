@@ -2,7 +2,7 @@
 import datetime
 import pandas as pd
 import numpy as np
-from .get_stocks_data import get_stock_fundamentals, get_stockdata_by_dates, get_stockdata_by_cal_days
+from get_stocks_data import get_stock_fundamentals, get_stockdata_by_dates, get_stockdata_by_cal_days
 
 
 class StockMetricsCalculator:
@@ -58,7 +58,7 @@ class StockMetricsCalculator:
   def _52Wrange(self,ticker):
       low52 = self.fundamentalData[self.fundamentalData["Symbol"] == ticker]["T52WeekLow"].values[0]
       high52 = self.fundamentalData[self.fundamentalData["Symbol"] == ticker]["T52WeekHigh"].values[0]
-      lastclose = self.rawdata[self.rawdata["Code"] == ticker].iloc[-1:].Close.values[0]
+      lastclose = self.rawdata[self.rawdata["Symbol"] == ticker].iloc[-1:].Close.values[0]
       relpos = (lastclose-low52)/(high52 - low52)
       statement =  "{ticker}'s last close was at {relpct}% of its 52 week range".format(ticker=ticker,relpct = round(relpos*100))
       interest = abs(relpos-0.5)*2

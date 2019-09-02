@@ -1,15 +1,12 @@
-import numpy as np
+#import numpy as np
 import pandas as pd
-from google.cloud import bigquery
+#from google.cloud import bigquery
 import datetime
 from datetime import datetime as dt, timedelta, date
-
-import os
-
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="../../sportsight-tests.json"
-__bigquery_client = bigquery.Client()
+from contendo_utils import BigqueryUtils, ProUtils
 
 # get list of stock action from date to date
+
 def get_stockdata_by_dates(stocklist, from_date, to_date):
     if len(stocklist)>0:
         tickersString = str(stocklist).replace('[', '').replace(']', '')
@@ -21,8 +18,8 @@ def get_stockdata_by_dates(stocklist, from_date, to_date):
     from_str = "'{}'".format(str(from_date)).replace("-","")
     stockDataQuery = """SELECT * FROM `sportsight-tests.Finance_Data.eod_daily_history_1year` WHERE {symbol_condition} AND FORMAT_DATE('%Y%m%d', Date) BETWEEN {from_str} AND {to_str} and Exchange in ('NYSE', 'NASDAQ') ORDER BY Symbol, Date""".format(symbol_condition=symbol_condition,from_str=from_str,to_str=to_str)
     #print (stockDataQuery)
-    query_job = __bigquery_client.query(stockDataQuery)
-    stockDataDF = query_job.result().to_dataframe().fillna('')
+    bqu = BigqueryUtils()
+    stockDataDF = bqu.execute_query_to_df(stockDataQuery)
     stockDataDF.index =pd.to_datetime(stockDataDF['Date'])
     stockDataDF.rename_axis("date", axis='index', inplace=True)
     return stockDataDF
@@ -41,15 +38,17 @@ def get_stock_fundamentals(stocklist=[], index=None):
     else:
         where_condition = 'TRUE'
     stockDataQuery = """SELECT * FROM `sportsight-tests.Finance_Data.all_company_data` WHERE {where_condition} ORDER BY Symbol""".format(where_condition=where_condition)
-    query_job = __bigquery_client.query(stockDataQuery)
-    stockDataDF = query_job.result().to_dataframe().fillna('')
+    bqu = BigqueryUtils()
+    stockDataDF = bqu.execute_query_to_df(stockDataQuery)
     return stockDataDF
 
 
 if __name__ == '__main__':
+    import os
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "../../../../sportsight-tests.json"
     # Test
     startTime = dt.now()
-    companiesDF = get_stock_fundamentals(index='SNP')
+    companiesDF = get_stock_fundamentals(index='DJI')
     symbolList = list(companiesDF['Symbol'])
     print(symbolList)
     print(dt.now()- startTime)
@@ -57,4 +56,4 @@ if __name__ == '__main__':
     a = get_stockdata_by_cal_days(symbolList,365,datetime.date.today())
     print(dt.now()- startTime)
     print(a.shape)
-    a.to_csv('stocks.csv')
+    #a.to_csv('../../../../results/stocks.csv')
