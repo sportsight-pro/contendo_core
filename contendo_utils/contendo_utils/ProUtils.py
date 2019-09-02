@@ -1,3 +1,6 @@
+import json
+import os
+
 class ProUtils:
     def __init__(self):
         return
@@ -35,6 +38,35 @@ class ProUtils:
     def commastring_to_liststring(commaString):
         ret = str(str.split(commaString, ',')).replace('[', '').replace(']', '')
         return ret
+
+
+    @staticmethod
+    def get_string_from_file(fileName):
+        file = open(fileName, 'r')
+        ret = file.read()
+        file.close()
+        return ret
+
+    @staticmethod
+    def write_string_to_file(fileName, text):
+        file = open(fileName, 'w')
+        file.write(text)
+        file.close()
+        return
+
+    @staticmethod
+    def get_dict_from_jsonfile(jsonFileName):
+        jsonFile = open(jsonFileName, 'r')
+        ret = json.load(jsonFile)
+        jsonFile.close()
+        return ret
+
+    @staticmethod
+    def save_dict_to_jsonfile(jsonFileName, dict):
+        jsonFile = open(jsonFileName, 'w')
+        json.dump(dict, jsonFile)
+        jsonFile.close()
+        return
 
 #pu = ProUtils()
 #print(pu.commastring_to_liststring('a,b,c,d'))

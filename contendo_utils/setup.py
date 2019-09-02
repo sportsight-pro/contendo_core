@@ -1,9 +1,9 @@
 from setuptools import setup
 
 setup(name='contendo_utils',
-      version='0.1',
+      version='0.2',
       description='General python and google-cloud related utilities',
-      url='http://github.com/storborg/funniest',
+      url='https://github.com/sportsight-pro/sportsight-core/tree/master/contendo_utils',
       author='Yahali Sherman, contendo.ai',
       author_email='yahali@contendo.ai',
       license='MIT',
