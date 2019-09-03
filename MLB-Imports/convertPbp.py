@@ -17,4 +17,5 @@ def converPbp():
 
 #
 # Test
-converPbp()
+if __name__ == '__main__':
+    converPbp()

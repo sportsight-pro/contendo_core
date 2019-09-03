@@ -263,8 +263,8 @@ class MsfImportMlb:
 
 
 
-import os
 def test():
+    import os
     os.chdir('../../')
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="sportsight-tests.json"
     mi = MsfImportMlb()
@@ -273,4 +273,5 @@ def test():
     mi.get_game_days_stats()
     print('Done')
 
-#test()
+if __name__ == '__main__':
+    test()
