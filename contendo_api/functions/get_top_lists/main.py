@@ -5,7 +5,8 @@ import json
 from contendo_utils import BigqueryUtils
 from contendo_utils import ProUtils
 from StockMetricsCalculator import StockMetricsCalculator
-from get_stocks_data import get_stock_fundamentals
+from get_stocks_data import GetStocksData
+from GetStockNews import GetStockNews
 
 def one_list_generator(listConfigDict, startTime=dt.now()):
     listsDefDict = ProUtils.get_dict_from_jsonfile('lists_config.json')
@@ -50,6 +51,7 @@ def one_list_generator(listConfigDict, startTime=dt.now()):
     print('Starting get-top-list for {} query execution'.format(instructions), dt.now()-startTime)
     bqu = BigqueryUtils()
     listDF = bqu.execute_query_to_df(query)
+    print(list(listDF['Symbol']))
     #listDF = listDF.query('TopBottom=="TOP"')
     #print (listDF.columns, listDF.shape, dt.now()-startTime)
     listDict = ProUtils.pandas_df_to_dict(listDF, 'TopRank')
@@ -57,10 +59,13 @@ def one_list_generator(listConfigDict, startTime=dt.now()):
     #
     # getting additional info
     print('Starting get_stock_fundamentals for {}'.format('SNP'), dt.now()-startTime)
-    companiesDF = get_stock_fundamentals(index='SNP')
+    getstocks = GetStocksData()
+    companiesDF = getstocks.get_stock_fundamentals(index='SNP')
     symbolList = list(companiesDF['Symbol'])
-    print('Starting StockMetricsCalculator for {}'.format(symbolList), dt.now()-startTime)
+    print('Starting StockMetricsCalculator for {}, {} companies'.format(symbolList, len(symbolList)), dt.now()-startTime)
     smc = StockMetricsCalculator(symbolList,(2018,9,1),timeframe_name="52 week")
+    print('Done StockMetricsCalculator', dt.now()-startTime)
+    gsn = GetStockNews()
     for key, stockDict in listDict.items():
         interestingStatements = []
         try:
@@ -68,11 +73,14 @@ def one_list_generator(listConfigDict, startTime=dt.now()):
             for i, statement in interestingStatementsDF.iterrows():
                 interestingStatements.append(dict(statement))
         except Exception as e:
-            print("Exception {} while getting statements for {}, ".format(e, stockDict))
+            print("Exception {} while getting statements for {}".format(e, stockDict))
+            #raise e
 
         stockDict['InterestingStatements'] = interestingStatements
+        stockDict['RelevantNews'] = gsn.get_stocknews_byticker(stockDict['Symbol'])
 
     listDict['Description'] = listConfig['QuestionDescription']
+    print(listDict, dt.now()-startTime )
     return json.dumps(listDict)
 
 def get_top_lists(request):

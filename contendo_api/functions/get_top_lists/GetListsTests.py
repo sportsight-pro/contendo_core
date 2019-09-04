@@ -6,7 +6,8 @@ def test_getlists_args():
     testDict = {}
     testDict['Listname'] = 'DollarVolume'
     testDict['Index'] = 'SNP'
-    testDict['Sector'] = 'Technology'
+    #testDict['Sector'] = 'Technology'
+
     testDict['MarketCapMin'] = 1000
     testDict['MarketCapMax'] = 10000000
 
@@ -18,7 +19,8 @@ def test_getlists_args():
 
 def test_getlists_json():
     testDict = {}
-    testDict['Listname'] = 'DollarVolume'
+    testDict['Listname'] = 'DailyGain'
+
     testDict['Index'] = 'SNP'
     # testDict['Sector'] = 'Technology'
     testDict['MarketCapMin'] = 1000
@@ -27,13 +29,14 @@ def test_getlists_json():
     req = Mock(get_json=Mock(return_value=testDict), json=testDict)
 
     res = get_top_lists(req)
-    print(res)
+    #print(res)
+
     assert 'Error' not in res
 
 import os
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
 print(os.getcwd())
-os.chdir('functions/get_top_lists')
+#os.chdir('functions/get_top_lists')
 from functions.get_top_lists.main import get_top_lists
 test_getlists_args()
 #test_getlists_json()

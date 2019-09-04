@@ -1,59 +1,89 @@
-#import numpy as np
 import pandas as pd
-#from google.cloud import bigquery
+import os
 import datetime
 from datetime import datetime as dt, timedelta, date
 from contendo_utils import BigqueryUtils, ProUtils
 
 # get list of stock action from date to date
 
-def get_stockdata_by_dates(stocklist, from_date, to_date):
-    if len(stocklist)>0:
-        tickersString = str(stocklist).replace('[', '').replace(']', '')
-        symbol_condition = 'Symbol IN ({tickersString})'.format(tickersString=tickersString)
-    else:
-        symbol_condition = 'TRUE'
+class GetStocksData:
 
-    to_str = "'{}'".format(str(to_date)).replace("-","")
-    from_str = "'{}'".format(str(from_date)).replace("-","")
-    stockDataQuery = """SELECT * FROM `sportsight-tests.Finance_Data.eod_daily_history_1year` WHERE {symbol_condition} AND FORMAT_DATE('%Y%m%d', Date) BETWEEN {from_str} AND {to_str} and Exchange in ('NYSE', 'NASDAQ') ORDER BY Symbol, Date""".format(symbol_condition=symbol_condition,from_str=from_str,to_str=to_str)
-    #print (stockDataQuery)
-    bqu = BigqueryUtils()
-    stockDataDF = bqu.execute_query_to_df(stockDataQuery)
-    stockDataDF.index =pd.to_datetime(stockDataDF['Date'])
-    stockDataDF.rename_axis("date", axis='index', inplace=True)
-    return stockDataDF
+    def __init__(self):
+        self.bqu = BigqueryUtils()
+        self.companiesDF = None
+        self.stocksDF = None
+        self.resourceDir = 'resource'
+        self.companiesDataFileName = '{}/companies_{}.csv'.format(self.resourceDir, date.today())
+        self.stocksDataFileName = '{}/stocks_{}.csv'.format(self.resourceDir, date.today())
+        self.companiesURL = 'gs://sport-uploads/Finance/companies_fundamentals.csv'
+        self.stocksURL = 'gs://sport-uploads/Finance/eod_stocks_data.csv'
 
-# get list of stock action x days to date
-def get_stockdata_by_cal_days(stocklist,numdays,to_date):
-    from_date = to_date - datetime.timedelta(days=numdays-1)
-    return get_stockdata_by_dates(stocklist, from_date, to_date)
+    def get_stockdata_by_dates(self, stocklist, from_date, to_date):
+        #
+        # get updated company data
+        if self.stocksDF is None:
+            if os.path.exists(self.stocksDataFileName):
+                self.stocksDF = pd.read_csv(self.stocksDataFileName)
+            else:
+                stocksQuery = """SELECT * FROM `sportsight-tests.Finance_Data.eod_daily_history_1year` order by Symbol, Date"""
+                self.stocksDF = self.bqu.execute_query_to_df(stocksQuery)
+                if not os.path.exists(self.resourceDir):
+                    os.mkdir(self.resourceDir)
+                self.stocksDF.to_csv(self.stocksDataFileName)
+                #url = self.bqu.upload_file_to_gcp('sport-uploads', self.stocksDataFileName, self.stocksURL.replace('gs://sport-uploads/', ''))
 
-def get_stock_fundamentals(stocklist=[], index=None):
-    if len(stocklist)>0:
-        tickersString = str(stocklist).replace('[', '').replace(']', '')
-        where_condition = 'Symbol IN ({tickersString})'.format(tickersString=tickersString)
-    elif index in ['DJI', 'SNP']:
-        where_condition = 'is{index}'.format(index=index)
-    else:
-        where_condition = 'TRUE'
-    stockDataQuery = """SELECT * FROM `sportsight-tests.Finance_Data.all_company_data` WHERE {where_condition} ORDER BY Symbol""".format(where_condition=where_condition)
-    bqu = BigqueryUtils()
-    stockDataDF = bqu.execute_query_to_df(stockDataQuery)
-    return stockDataDF
+        if len(stocklist)>0:
+            symbol_condition = 'Symbol in {tickersString} and '.format(tickersString=str(stocklist))
+        else:
+            symbol_condition = ''
+
+        stocksQuery = '{symbol_condition} Date >= "{from_date}" and Date <= "{to_date}"'.format(symbol_condition=symbol_condition, from_date=from_date, to_date=to_date)
+        stockDataDF = self.stocksDF.query(stocksQuery)
+        stockDataDF.index = pd.to_datetime(stockDataDF['Date'])
+        stockDataDF.rename_axis("date", axis='index', inplace=True)
+        return stockDataDF
+
+    # get list of stock action x days to date
+    def get_stockdata_by_cal_days(self, stocklist, numdays, to_date):
+        from_date = to_date - datetime.timedelta(days=numdays-1)
+        return self.get_stockdata_by_dates(stocklist, from_date, to_date)
+
+    def get_stock_fundamentals(self, stocklist=[], index=None):
+        #
+        # get updated company data
+        if self.companiesDF is None:
+            if os.path.exists(self.companiesDataFileName):
+                self.companiesDF = pd.read_csv(self.companiesDataFileName)
+            else:
+                companiesQuery = """SELECT * FROM `sportsight-tests.Finance_Data.all_company_data` WHERE MarketCapitalizationMln > 1000"""
+                self.companiesDF = self.bqu.execute_query_to_df(companiesQuery, fillna=0)
+                if not os.path.exists(self.resourceDir):
+                    os.mkdir(self.resourceDir)
+                self.companiesDF.to_csv(self.companiesDataFileName)
+                #url = self.bqu.upload_file_to_gcp('sport-uploads', self.companiesDataFileName, self.companiesURL.replace('gs://sport-uploads/', ''))
+
+        if len(stocklist)>0:
+            where_condition = 'Symbol in {tickersString}'.format(tickersString=str(stocklist))
+        elif index in ['DJI', 'SNP']:
+            where_condition = 'is{index}'.format(index=index)
+        else:
+            return self.companiesDF
+
+        return self.companiesDF.query(where_condition)
 
 
 if __name__ == '__main__':
-    import os
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "../../../../sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     # Test
     startTime = dt.now()
-    companiesDF = get_stock_fundamentals(index='DJI')
+    getstocks = GetStocksData()
+    companiesDF = getstocks.get_stock_fundamentals(index='SNP')
+    #companiesDF = getstocks.get_stock_fundamentals(['MSFT', 'AAPL'])
     symbolList = list(companiesDF['Symbol'])
-    print(symbolList)
+    print(symbolList, len(symbolList))
     print(dt.now()- startTime)
     #a = get_stockdata_by_cal_days(["AAPL","IBM"],90,datetime.date.today())
-    a = get_stockdata_by_cal_days(symbolList,365,datetime.date.today())
+    a = getstocks.get_stockdata_by_cal_days([], 365, datetime.date.today())
     print(dt.now()- startTime)
     print(a.shape)
     #a.to_csv('../../../../results/stocks.csv')
