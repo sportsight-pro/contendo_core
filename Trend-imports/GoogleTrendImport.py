@@ -60,12 +60,12 @@ class GoogleTrendImport:
         outfile.close()
         return filename
 
-from contendo_utils import BigqueryUtils
-import os
 
 def test():
+    from contendo_utils import BigqueryUtils
+    import os
     os.chdir('/Users/ysherman/Documents/GitHub/results/trends')
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     query = 'SELECT Code, Name, Sector, count(*) count FROM `sportsight-tests.Finance_Data.indices_company_list` left join unnest(Components) group by 1,2,3 having count>0 order by count desc, name'
     bqu = BigqueryUtils()
 
@@ -80,4 +80,5 @@ def test():
         bqu.create_table_from_local_file(filename, datasetId, 'daily_trends', writeDisposition='WRITE_APPEND')
     'Done'
 
-test()
+if __name__ == '__main__':
+    test()

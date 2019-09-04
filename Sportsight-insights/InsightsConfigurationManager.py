@@ -49,7 +49,11 @@ class InsightsConfigurationManager:
         return contentDefinitionTableId
 
 def test():
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
+    print("Starting... cwd=", os.getcwd())
+    startTime = dt.now()
+    root = os.getcwd()  # + '/sportsight-core/Sportsight-insights'
+    os.chdir('../../')
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     icm = InsightsConfigurationManager()
     tableId = icm.save_configuration_to_bigquery('Finance_All')
     print('Done ' + tableId)

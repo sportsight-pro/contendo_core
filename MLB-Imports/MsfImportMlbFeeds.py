@@ -4,7 +4,7 @@ from ohmysportsfeedspy import MySportsFeeds
 import json, os
 from google.cloud import bigquery
 import pandas as pd
-import BigqueryUtils as bqu
+from contendo_utils import BigqueryUtils
 
 
 class MsfImportMlb:
@@ -15,7 +15,7 @@ class MsfImportMlb:
         apikey = '98de7b49-a696-4ed7-8efa-94b28a'
         self.msf = MySportsFeeds(version="2.0")
         self.msf.authenticate(apikey, "MYSPORTSFEEDS")
-        self.bqu = bqu.BigqueryUtils()
+        self.bqu = BigqueryUtils()
 
     def get_seasonal_stats(self):
         start_time=dt.now()
@@ -266,7 +266,7 @@ class MsfImportMlb:
 def test():
     import os
     os.chdir('../../')
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     mi = MsfImportMlb()
     #mi.get_seasonal_stats()
     #mi.get_game_pbp()

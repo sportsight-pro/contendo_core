@@ -413,7 +413,7 @@ class SimpleStatsGenerator():
                 break
 
 def test():
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     root = os.getcwd() #+ '/sportsight-core/Sportsight-insights'
     os.chdir('../../')
     generator = SimpleStatsGenerator(root)#'Baseball.PlayerSeasonStats')

@@ -2,13 +2,6 @@ from datetime import datetime as dt
 import os, time
 import InsightsGenerator, InsightsPackaging, SimpleStatsGenerator, MsfImportMlbFeeds
 
-print("Starting... cwd=", os.getcwd())
-startTime = dt.now()
-root = os.getcwd() #+ '/sportsight-core/Sportsight-insights'
-os.chdir('../../')
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
-
-
 def import_and_generate_stats():
     mi = MsfImportMlbFeeds.MsfImportMlb()
     print('Created MSF imports & Stats generator, delta time: {}'.format(dt.now() - startTime))
@@ -44,6 +37,10 @@ def questions_generation():
             print("Error: {}".format(e))
             continue
 
+if __name__ == '__main__':
+    startTime = dt.now()
+    root = os.getcwd()  # + '/sportsight-core/Sportsight-insights'
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
 
-#import_and_generate_stats()
-questions_generation()
+    import_and_generate_stats()
+    questions_generation()

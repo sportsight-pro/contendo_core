@@ -6,14 +6,14 @@ import re
 import glob
 import csv
 import json
-import BigqueryUtils
+from contendo_utils import BigqueryUtils
 import eod_historical_data_extended as eod
-import ProducerConsumersEngine
+from contendo_utils import ProducerConsumersEngine
 
-class EODHistoricalDataImport(ProducerConsumersEngine.ProducerConsumersEngine):
+class EODHistoricalDataImport:
     def __init__(self):
-        ProducerConsumersEngine.ProducerConsumersEngine.__init__(self, self.import_daily_quotes)
-        self.bqu = BigqueryUtils.BigqueryUtils()
+        #ProducerConsumersEngine.__init__(self, self.import_daily_quotes)
+        self.bqu = BigqueryUtils()
         self.main_dir = '/Users/ysherman/Documents/GitHub/results/Finance/EODHistoricalData/daily-quotes/'
         #self.AV_api_key = 'NN4P0527XD25VT1Q'
         #self.WTD_apikey = 'kDxr9tfB8fYVUV0wnkNzZN4W3IQZO48hLOpFKJ2NIiHbHSgKsTyMt4jzW3Cm'
@@ -29,7 +29,7 @@ class EODHistoricalDataImport(ProducerConsumersEngine.ProducerConsumersEngine):
             os.mkdir(csv_dir)
         #datesPD = self.bqu.execute_query_to_df ("SELECT distinct format_date('%Y-%m-%d', timestamp) as Date FROM `sportsight-tests.Finance_Data.daily_stock_history_*` where timestamp<=parse_date('%x', '09/25/18') order by Date desc limit 230")
         #datesList = list(datesPD['Date'])
-        datesList = ['2019-08-31', '2019-09-01'] #list(datesPD['Date'])
+        datesList = ['2019-09-03'] #list(datesPD['Date'])
         for stockDate in datesList:
             dailyDF = pd.DataFrame()
             for exchange in ['COMM', 'INDX', 'NASDAQ', 'NYSE']:
@@ -139,6 +139,25 @@ class EODHistoricalDataImport(ProducerConsumersEngine.ProducerConsumersEngine):
                 print('Error {}, Stock: {}'.format(e, stockCode))
         return False
 
+    def import_indices_fundamentals(self):
+        outfileName = '{}/tmp/indices.json'.format(os.environ['HOME'])
+        outfile = open(outfileName, 'w')
+        for index in ['DJI', 'GSPC']:
+            indexData = eod.get_fundamental_data(index, 'INDX', self.EODHD_apikey)
+            newIndex = {}
+            newIndex['General'] = indexData['General']
+            complist = []
+            for key, value in indexData['Components'].items():
+                component = value
+                component['Index'] = int(key)
+                complist.append(component)
+            newIndex['Components'] = complist
+            newIndex['NumComponents'] = len(complist)
+            json.dump(newIndex, outfile)
+            outfile.write('\n')
+        outfile.close()
+        self.bqu.create_table_from_local_file(outfileName, 'Finance_Data', 'indices_company_list')
+
     def import_daily_quotes(self, configurations, startTime):
         print("Starting import_daily_quotes")
         comp_df = self.bqu.execute_query_to_df(self.EOD_Symbols_Query)
@@ -211,7 +230,7 @@ class EODHistoricalDataImport(ProducerConsumersEngine.ProducerConsumersEngine):
         extension = 'csv'
         all_filenames = [i for i in glob.glob('dated-files/2019-08*.{}'.format(extension))]
         print(all_filenames)
-        bqu = BigqueryUtils.BigqueryUtils()
+        bqu = BigqueryUtils()
         main_start_time = dt.now()
         count = 0
         for csvFileName in all_filenames:
@@ -230,17 +249,19 @@ class EODHistoricalDataImport(ProducerConsumersEngine.ProducerConsumersEngine):
 
 
 def test():
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     startTime = dt.now()
 
     ehd = EODHistoricalDataImport()
     #ehd.run(numExecutors=2)
     #ehd.import_daily_quotes([], startTime)
     #date = '2019-08-20'
-    ehd.get_eod_daily_bulk(startTime)
-    ehd.get_fundamentals_data(startTime)
+    #ehd.get_eod_daily_bulk(startTime)
+    #ehd.get_fundamentals_data(startTime)
+    ehd.import_indices_fundamentals()
     #ehd.create_dated_quote_files('2019-08-21')
     #ehd.upload_dated_quote_files('20190820')
     'Done'
 
-test()
+if __name__ == '__main__':
+    test()

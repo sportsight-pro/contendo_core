@@ -4,8 +4,6 @@ import os
 import multiprocessing
 import time
 import pandas as pd
-import BigqueryUtils as bqu
-import ProUtils as pu
 
 class ProducerConsumersEngine():
     #

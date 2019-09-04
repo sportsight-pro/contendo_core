@@ -142,8 +142,7 @@ def test():
     import os, time
     import InsightsGenerator
 
-    #print (os.getcwd())
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     startTime = dt.now()
     root = os.getcwd() #+ '/sportsight-core/Sportsight-insights'
     os.chdir('/Users/ysherman/Documents/GitHub/')

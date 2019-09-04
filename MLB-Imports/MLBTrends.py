@@ -59,7 +59,7 @@ class MLBTrends:
 
 
 def test():
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "../../sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     mt = MLBTrends()
     mt.get_teams_trend()
 

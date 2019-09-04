@@ -146,7 +146,7 @@ alpha_url = 'https://www.alphavantage.co/query?function={AnalyticFunction}&symbo
     '{api_key}', api_key)
 
 def test():
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
 
     date = '2019-08-20'
     import_daily_quotes()

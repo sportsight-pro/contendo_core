@@ -157,7 +157,7 @@ class ComplexStatsGenerator():
                 break
 
 def test():
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "../sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     generator = SimpleStatsGenerator()  # 'Baseball.PlayerSeasonStats')
     generator.run(all=True)
     # 7generator.run(stats=['pitching.pitchesPerInning'])

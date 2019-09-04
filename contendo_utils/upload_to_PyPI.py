@@ -1,6 +1,6 @@
 import os
 print ('[Register]')
-#os.system('python setup.py register')
+os.system('python setup.py register')
 print ('[sdist]')
 os.system('python setup.py sdist')
 print ('[Upload-test]')

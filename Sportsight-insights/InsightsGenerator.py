@@ -136,7 +136,8 @@ class InsightsGenerator:
 def test():
     import os
     from datetime import datetime as dt
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
+
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     startTime = dt.now()
     root = os.getcwd()
     ig = InsightsGenerator(root)

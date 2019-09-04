@@ -89,7 +89,7 @@ import BigqueryUtils
 
 def upload_files():
     os.chdir("/Users/ysherman/Documents/GitHub/results/Finance/daily-quotes/dated-files")
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     extension = 'csv'
     all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
     print(all_filenames[0:10])
@@ -114,7 +114,7 @@ def upload_files():
 def test():
     #combine_files()
     import EODHistoricalDataImport
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/ysherman/Documents/GitHub/sportsight-tests.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     startTime = dt.now()
 
     ehd = EODHistoricalDataImport.EODHistoricalDataImport()
