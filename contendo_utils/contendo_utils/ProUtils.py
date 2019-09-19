@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 
 class ProUtils:
     def __init__(self):
@@ -67,6 +68,13 @@ class ProUtils:
         json.dump(dict, jsonFile)
         jsonFile.close()
         return
+
+
+    @staticmethod
+    def create_path_directories(path):
+        while not os.path.exists(Path(path).parent):
+            ProUtils.create_path_directories(Path(path).parent)
+            os.mkdir(Path(path).parent)
 
 #pu = ProUtils()
 #print(pu.commastring_to_liststring('a,b,c,d'))
