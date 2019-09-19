@@ -1,4 +1,6 @@
-from google.cloud import bigquery, storage
+from google.cloud import bigquery
+from google.cloud import storage
+from gcsfs import GCSFileSystem
 
 class BigqueryUtils:
     def __init__(self):
@@ -24,6 +26,25 @@ class BigqueryUtils:
         blob = bucket.blob(targerFileName)
         res = blob.upload_from_filename(inFileName)
         return 'gs://{}/{}'.format(bucketName, targerFileName)
+
+    def upload_string_to_gcp(self, data, bucketName, targetFileName):
+        bucket = self.__storage_client.get_bucket(bucketName)
+        blob = bucket.blob(targetFileName)
+        res = blob.upload_from_string(data)
+        return 'gs://{}/{}'.format(bucketName, targetFileName)
+
+    def read_string_from_gcp(self, bucketName, fromFileName):
+        data = None
+        try:
+            bucket = self.__storage_client.get_bucket(bucketName)
+            blob = bucket.blob(fromFileName)
+            data = blob.download_as_string()
+        #except storage. NotFound as e:
+        #    print('Info: File not found in BigqueryUtils.read_string_from_gcp({}, {})', bucketName, fromFileName)
+        except Exception as e:
+            print ('Error in BigqueryUtils.read_string_from_gcp({}, {}) {}, trace {}', bucketName, fromFileName, e, type(e))
+
+        return data
 
     def create_table_from_gcp_file(self, gcpFileURI, datasetId, tableId, writeDisposition='WRITE_APPEND'):
         datasetRef = self.__bigquery_client.dataset(datasetId)
