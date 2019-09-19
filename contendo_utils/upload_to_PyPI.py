@@ -1,4 +1,5 @@
 import os
+os.system('rm -r dist')
 print ('[Register]')
 os.system('python setup.py register')
 print ('[sdist]')

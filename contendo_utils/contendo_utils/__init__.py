@@ -1,2 +1,3 @@
 from .BigqueryUtils import BigqueryUtils
 from .ProUtils import ProUtils
+from .contendo_configuration_manager import ContendoConfigurationManager
