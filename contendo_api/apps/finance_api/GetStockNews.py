@@ -41,6 +41,9 @@ class GetStockNews:
 
         data = json.loads(text)
 
+        if not 'data' in data:
+            print ('Error getting news for tickers {}, return={}'.format(tickers, data))
+            return {}
         newsDict = data['data']
 
         sentimentDict = {'Count': 0, 'Negative': 0, 'Positive': 0, 'Neutral': 0, 'Weighted': 0}
@@ -50,7 +53,7 @@ class GetStockNews:
         startTime=dt.utcnow()
         for newsItem in newsDict:
             count+=1
-            newItem = {key: newsItem[key] for key in ['title', 'news_url', 'text', 'sentiment', 'source_name', 'topics']}
+            newItem = {key: newsItem[key] for key in ['title', 'text', 'sentiment', 'source_name', 'topics', 'news_url', 'image_url']}
             newItem['index'] = count
             itemDate = dt.strptime(newsItem['date'], '%a, %d %b %Y %H:%M:%S %z')
             delta = startTime.date() - itemDate.date()

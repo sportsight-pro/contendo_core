@@ -40,7 +40,8 @@ WITH
     '{StatName}' AS StatName,
     *,
     LAG(adjClose) OVER (PARTITION BY code ORDER BY date) prevAdjClose
-
+    #if (LAG(adjClose) <= adjClose, 0, 1) OVER (PARTITION BY code ORDER BY date) isUp,
+    #if (LAG(adjClose) >= adjClose, 0, 1) OVER (PARTITION BY code ORDER BY date) isDown
   FROM
     base_data_filtered),
   first_close_since AS (

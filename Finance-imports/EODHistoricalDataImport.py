@@ -6,15 +6,19 @@ import re
 import glob
 import csv
 import json
-from contendo_utils import BigqueryUtils
+import threading
+import multiprocessing
+
 import eod_historical_data_extended as eod
+
+from contendo_utils import BigqueryUtils
 from contendo_utils import ProducerConsumersEngine
 
 class EODHistoricalDataImport:
     def __init__(self):
         #ProducerConsumersEngine.__init__(self, self.import_daily_quotes)
         self.bqu = BigqueryUtils()
-        self.main_dir = '/Users/ysherman/Documents/GitHub/results/Finance/EODHistoricalData/daily-quotes/'
+        self.main_dir = '{}/tmp/results/Finance/EODHistoricalData/daily-quotes/'.format(os.environ['HOME'])
         #self.AV_api_key = 'NN4P0527XD25VT1Q'
         #self.WTD_apikey = 'kDxr9tfB8fYVUV0wnkNzZN4W3IQZO48hLOpFKJ2NIiHbHSgKsTyMt4jzW3Cm'
         self.EODHD_apikey = '5d5d1d7259ef23.41685254'
@@ -22,6 +26,7 @@ class EODHistoricalDataImport:
         self.EOD_Symbols_Query = "SELECT Code, Exchange, Type FROM `sportsight-tests.Finance_Data.eod_exchange_symbols_list` where Exchange in ('COMM', 'NYSE', 'NASDAQ', 'INDX') order by exchange desc"
         self.FUNDAMENTALS_Query = "SELECT Code, Exchange, Type FROM `sportsight-tests.Finance_Data.eod_exchange_symbols_list` where Exchange in ('NYSE', 'NASDAQ') AND type='Common Stock' order by exchange desc"
         self.EOD_DAYBULK_URL = 'https://eodhistoricaldata.com/api/eod-bulk-last-day/{}?api_token=5d5d1d7259ef23.41685254&filter=extended&date={}'
+        self.__sentinel = 'Done'
 
     def get_eod_daily_bulk(self, startTime):
         csv_dir = self.main_dir + 'dated-files/'
@@ -29,7 +34,8 @@ class EODHistoricalDataImport:
             os.mkdir(csv_dir)
         #datesPD = self.bqu.execute_query_to_df ("SELECT distinct format_date('%Y-%m-%d', timestamp) as Date FROM `sportsight-tests.Finance_Data.daily_stock_history_*` where timestamp<=parse_date('%x', '09/25/18') order by Date desc limit 230")
         #datesList = list(datesPD['Date'])
-        datesList = ['2019-09-03'] #list(datesPD['Date'])
+        datesList = ['2019-09-24'] #list(datesPD['Date'])
+
         for stockDate in datesList:
             dailyDF = pd.DataFrame()
             for exchange in ['COMM', 'INDX', 'NASDAQ', 'NYSE']:
@@ -72,50 +78,80 @@ class EODHistoricalDataImport:
             #break
         print('Done', dt.now()-startTime)
 
+    def get_fundamentals_data_consumer(self, stock, count, startTime, writelock, **args):
+        while True:
+            try:
+                retDict = eod.get_fundamental_data(stock['Code'], 'US', api_key=self.EODHD_apikey)
+                break
+            except Exception as e:
+                if str(e).index('429')==-1:
+                    raise e
+                else:
+                    print(e)
+                    time.sleep(1)
+        try:
+            relevantKeys = ['General', 'Highlights', 'Valuation', 'SharesStats']
+            stockData = {x: retDict[x] for x in relevantKeys if x in retDict}
+            stockData['Time'] = dt.now().strftime('%Y-%m-%dT%H:%M:%S')
+            technicalsDict = {}
+            for key, value in retDict['Technicals'].items():
+                if key[0] in '0123456789':
+                    technicalsDict['T' + key] = value
+                else:
+                    technicalsDict[key] = value
+            stockData['Technicals'] = technicalsDict
+            writelock.acquire()
+            json.dump(stockData, self.outfile)
+            self.outfile.write('\n')
+            self.outfile.flush()
+            self.successCount['count'] += 1
+            writelock.release()
+            print('Done', count, stock, dt.now() - startTime)
+
+        except Exception as e:
+            print("Error {} with {}".format(e, stock))
+            #raise e
+
+    def get_fundamentals_data_producer(self, numExecutors, jobsQueue, startTime, **kwargs):
+        stocksDict = self.bqu.execute_query_to_dict(self.FUNDAMENTALS_Query)
+        print('Getting {} stocks data'.format(stocksDict['nRows']))
+        count = 0
+        for stock in stocksDict['Rows']:
+            count += 1
+            inst = {
+                'stock': stock,
+                'count': count,
+                'startTime': startTime,
+            }
+            jobsQueue.put(ProducerConsumersEngine.PCEngineJobData(self.get_fundamentals_data_consumer, inst))
+
     def get_fundamentals_data(self, startTime):
         fundamentals_dir = self.main_dir + 'fundamentals/'
         if not os.path.exists(fundamentals_dir):
             os.mkdir(fundamentals_dir)
         jsonFileName = 'fundamentals-{}.json'.format(dt.now().strftime('%Y-%m-%dT%H%M%S'))
         outfileName = fundamentals_dir + jsonFileName
-        outfile = open(outfileName, 'w')
 
-        stocksDict = self.bqu.execute_query_to_dict (self.FUNDAMENTALS_Query)
-        print('Getting {} stocks data'.format(stocksDict['nRows']))
-        count=0
-        successCount=0
-        for stock in stocksDict['Rows']:
-            count += 1
-            print(count, stock, dt.now()-startTime)
-            try:
-                retDict = eod.get_fundamental_data(stock['Code'], 'US', api_key=self.EODHD_apikey)
-                relevantKeys = ['General', 'Highlights', 'Valuation', 'SharesStats']
-                stockData={x: retDict[x] for x in relevantKeys if x in retDict}
-                stockData['Time']=dt.now().strftime('%Y-%m-%dT%H:%M:%S')
-                technicalsDict={}
-                for key, value in retDict['Technicals'].items():
-                    if key[0] in '0123456789':
-                        technicalsDict['T'+key] = value
-                    else:
-                        technicalsDict[key] = value
-                stockData['Technicals'] = technicalsDict
-                json.dump(stockData,outfile)
-                outfile.write('\n')
-                successCount += 1
+        manager = multiprocessing.Manager()
+        self.successCount = manager.dict()
+        self.successCount['count'] = 0
+        self.outfile = open(outfileName, 'w')
 
-            except Exception as e:
-                print("Error {}".format(e))
-                #break
-            #break
-        outfile.close()
-        if successCount>0:
+        writelock = multiprocessing.Lock()
+        pce = ProducerConsumersEngine(self.get_fundamentals_data_producer)
+        pce.register_handler(self.get_fundamentals_data_consumer)
+        pce.run(numExecutors=8, startTime=startTime, writelock=writelock)
+
+        self.outfile.close()
+
+        if self.successCount['count']>0:
             datasetId = 'Finance_Data'
             tableId = 'fundamentals_daily_{}'.format(startTime.strftime('%Y%m%d'))
             self.bqu.create_dataset(datasetId)
             uri = self.bqu.upload_file_to_gcp('sport-uploads', outfileName, 'Finance/EOD/Fundamentals/{}'.format(jsonFileName))
             ret = self.bqu.create_table_from_gcp_file(uri, datasetId, tableId, 'WRITE_TRUNCATE')
 
-        print('Done', successCount, dt.now()-startTime)
+        print('Done', self.successCount['count'], dt.now()-startTime)
 
     def get_eod_quote(self, comp, startTime):
         stockCode = '{Code}-{Exchange}-{Type}'.format(**comp)
@@ -256,9 +292,9 @@ def test():
     #ehd.run(numExecutors=2)
     #ehd.import_daily_quotes([], startTime)
     #date = '2019-08-20'
-    #ehd.get_eod_daily_bulk(startTime)
-    #ehd.get_fundamentals_data(startTime)
+    ehd.get_eod_daily_bulk(startTime)
     ehd.import_indices_fundamentals()
+    ehd.get_fundamentals_data(startTime)
     #ehd.create_dated_quote_files('2019-08-21')
     #ehd.upload_dated_quote_files('20190820')
     'Done'

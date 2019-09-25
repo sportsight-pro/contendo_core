@@ -11,7 +11,7 @@ FROM (
     '{LeagueCode}' AS LeagueCode,
     Season AS SeasonCode,
     'N/A' as CompetitionStageCode,
-    '{DaysRange}' as CompetitionDay,
+    {DaysRange} as CompetitionDay,
     CAST({GameCode} as STRING) AS GameCode,
     'N/A' as GamePeriodCode,
     CAST({TeamType}.id AS STRING) AS TeamCode,
@@ -19,7 +19,10 @@ FROM (
     '{StatName}' AS StatName,
     ROUND({StatFunction}({PropertyName}),2) AS StatValue,
     Countif({PropertyName}>0) as Count,
-    '{Description}' as Description
+    '{Description}' as Description,
+    '{BaseStat}' AS BaseStat,
+    '{ConditionCode}' AS ConditionCode,
+    '{ObjectType}' AS ObjectType
   FROM
     `sportsight-tests.Baseball1.atBatPlays_pbp_enriched`
   WHERE

@@ -4,12 +4,13 @@ from unittest.mock import Mock
 
 def test_getlists_args():
     testDict = {}
-    testDict['Listname'] = 'DollarVolume'
-    testDict['Index'] = 'SNP'
-    #testDict['Sector'] = 'Technology'
+    testDict['Listname'] = 'YTDGain'
+    #testDict['Ticker'] = 'AMD'
 
-    testDict['MarketCapMin'] = 1000
-    testDict['MarketCapMax'] = 10000000
+    #testDict['Index'] = 'SNP'
+    #testDict['Sector'] = 'Technology'
+    #testDict['MarketCapMin'] = 1000
+    #testDict['MarketCapMax'] = 10000000
 
     req = Mock(get_json=Mock(return_value=testDict), args=testDict)
 

@@ -1,14 +1,22 @@
+import os
 import requests
 import json
 import datetime
 from datetime import datetime as dt, date
+
+import nltk
+from newspaper import Article
+
+from contendo_utils import BigqueryUtils
 from contendo_utils import ProUtils
-import os
 
 class GetStockNews:
     def __init__(self):
         stocknews_apikey='oywghpku7talnwtde1k4h5eqonrgze6i1v6fzmcq'
         self.stocknews_url_template = "https://stocknewsapi.com/api/v1?tickers={ticker}&items={nitems}&date={fromdate_MMDDYYYY}-today&sortby={sortby}&token={stocknews_apikey}".replace('{stocknews_apikey}', stocknews_apikey)
+        self.bqu = BigqueryUtils()
+        self.bucketName = 'sport-uploads'
+        #nltk.download('punkt')  # 1 time download of the sentence tokenizer
 
     def get_stocknews_byticker(self, tickersList, nitems=50, daysback=30, sortby='trending'):
         assert(sortby in ['trending', 'algo'])
@@ -21,17 +29,17 @@ class GetStockNews:
             'sortby': sortby,
             'today': date.today(),
         }
-        if not os.path.exists('temp'):
-            os.mkdir('temp')
-        outfileName = 'temp/{ticker}-{nitems}-{fromdate_MMDDYYYY}-{sortby}-{today}.json'.format(**urlInstructions)
-        if not os.path.exists(outfileName):
+        outfileName = 'Finance/temp/{ticker}-{nitems}-{fromdate_MMDDYYYY}-{sortby}-{today}.json'.format(**urlInstructions)
+
+        text = self.bqu.read_string_from_gcp(self.bucketName, outfileName)
+        if text is None:
             url = self.stocknews_url_template.format(**urlInstructions)
             print(url)
             response = requests.request("GET", url)
-            data = json.loads(response.text)
-            #ProUtils.save_dict_to_jsonfile(outfileName, data)
-        else:
-            data = ProUtils.get_dict_from_jsonfile(outfileName)
+            text = response.text
+            self.bqu.upload_string_to_gcp(response.text, self.bucketName, outfileName)
+
+        data = json.loads(text)
 
         newsDict = data['data']
 
@@ -48,6 +56,19 @@ class GetStockNews:
             delta = startTime.date() - itemDate.date()
             if delta.days <= 3 or count <= 3:
                 newItem['date'] = str(itemDate.date())
+                if False: # suspend getting the summary
+                    article = Article(newItem['news_url'])
+                    # Do some NLP
+                    try:
+                        article.download()  # Downloads the link’s HTML content
+                        article.parse()  # Parse the article
+                        article.nlp()  # Keyword extraction wrapper
+                        newItem['Summary'] = article.summary.replace('\n', '\n')
+                    except Exception as e:
+                        print ('Error occured:', e)
+                        newItem['Summary'] = "<...>"
+
+                #print(newItem['Summary'])
                 newsFeed.append(newItem)
             if delta.days<=3:
                 deltaWeight=1
@@ -74,6 +95,7 @@ class GetStockNews:
 
 
 if __name__ == '__main__':
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     startTime = dt.now()
     gsn = GetStockNews()
-    print(gsn.get_stocknews_byticker(['TSN']))
+    print(gsn.get_stocknews_byticker(['AMD']))

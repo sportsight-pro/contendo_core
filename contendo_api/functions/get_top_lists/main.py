@@ -32,10 +32,10 @@ def one_list_generator(listConfigDict, startTime=dt.now()):
     else:
         instructions['SectorCondition']='TRUE'
 
-    if listConfigDict['Index'] in ['DJI', 'SNP']:
+    if listConfigDict.get('Index', '') in ['DJI', 'SNP']:
         instructions['IndexCondition'] = 'is'+listConfigDict['Index']
     else:
-        instructions['IndexCondition'] = 'TRUE'
+        instructions['IndexCondition'] = 'isSNP'
 
     minMarketCap = listConfigDict.get('MarketCapMin', 1000)
     maxMarketCap = listConfigDict.get('MarketCapMax', 1000000000)
@@ -63,25 +63,56 @@ def one_list_generator(listConfigDict, startTime=dt.now()):
     companiesDF = getstocks.get_stock_fundamentals(index='SNP')
     symbolList = list(companiesDF['Symbol'])
     print('Starting StockMetricsCalculator for {}, {} companies'.format(symbolList, len(symbolList)), dt.now()-startTime)
-    smc = StockMetricsCalculator(symbolList,(2018,9,1),timeframe_name="52 week")
+    smc = StockMetricsCalculator(symbolList)
     print('Done StockMetricsCalculator', dt.now()-startTime)
     gsn = GetStockNews()
     for key, stockDict in listDict.items():
-        interestingStatements = []
-        try:
-            interestingStatementsDF = smc.get_interesting_statements(stockDict['Symbol'])
-            for i, statement in interestingStatementsDF.iterrows():
-                interestingStatements.append(dict(statement))
-        except Exception as e:
-            print("Exception {} while getting statements for {}".format(e, stockDict))
-            #raise e
-
-        stockDict['InterestingStatements'] = interestingStatements
+        stockDict['InterestingStatements'] = get_statements_for_ticker(stockDict['Symbol'], smc)
         stockDict['RelevantNews'] = gsn.get_stocknews_byticker(stockDict['Symbol'])
 
     listDict['Description'] = listConfig['QuestionDescription']
     print(listDict, dt.now()-startTime )
     return json.dumps(listDict)
+
+def get_statements_for_ticker(ticker, smc):
+    interestingStatements = []
+    try:
+        interestingStatementsDF = smc.get_interesting_statements(ticker)
+        for i, statement in interestingStatementsDF.iterrows():
+            interestingStatements.append(dict(statement))
+    except Exception as e:
+        print("Exception {} while getting statements for {}".format(e, stockDict), e.__traceback__)
+        raise e
+
+    return interestingStatements
+
+def ticker_generator(ticker, startTime=dt.now()):
+    #
+    # get basic stock data
+    getstocks = GetStocksData()
+    companiesDF = getstocks.get_stock_fundamentals([ticker])
+    stockDict = dict(companiesDF[['Symbol', 'Industry', 'Sector', 'Name', 'Exchange', 'T52WeekLow', 'T52WeekHigh', 'MarketCapitalizationMln', 'PERatio']].iloc[0])
+    print(stockDict)
+    #
+    # get interestinf statements for the stock.
+    companiesDF = getstocks.get_stock_fundamentals(index='SNP')
+    symbolList = list(companiesDF['Symbol'])
+    #print('Starting StockMetricsCalculator for {}, {} companies'.format(symbolList, len(symbolList)), dt.now()-startTime)
+    smc = StockMetricsCalculator(symbolList)
+    stockDict['InterestingStatements'] = get_statements_for_ticker(stockDict['Symbol'], smc)
+    #
+    # get the stock news for the ticker
+    gsn = GetStockNews()
+    stockDict['RelevantNews'] = gsn.get_stocknews_byticker(stockDict['Symbol'])
+    return json.dumps(stockDict)
+
+def handle_request(request_args):
+    if 'Listname' in request_args:
+        return one_list_generator(request_args)
+    elif 'Ticker' in request_args:
+        return ticker_generator(request_args['Ticker'])
+    else:
+        return {'Error': 'Illegal request'}
 
 def get_top_lists(request):
     """Responds to any HTTP request.
@@ -98,13 +129,18 @@ def get_top_lists(request):
     request_args = request.args
 
     if request_json:
-        return one_list_generator(request_json)
+        ret = handle_request(request_json)
+        print (type(ret), ret)
+        return ret
     elif request_args:
         print('args:', request_args)
-        return one_list_generator(request_args)
+        return handle_request(request_args)
     else:
         return 'Error with request {}'.format(escape(request.data))
 
     #except Exception as e:
     #    return 'Exception with request {}'.format(e)
 
+if __name__ == '__main__':
+    #ticker_generator('AAPL')
+    pass

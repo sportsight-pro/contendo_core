@@ -3,9 +3,13 @@ from google.cloud import storage
 from gcsfs import GCSFileSystem
 
 class BigqueryUtils:
-    def __init__(self):
-        self.__bigquery_client = bigquery.Client()
-        self.__storage_client  = storage.Client()
+    def __init__(self, project=None):
+        if project:
+            self.__bigquery_client = bigquery.Client(project=project)
+            self.__storage_client  = storage.Client(project=project)
+        else:
+            self.__bigquery_client = bigquery.Client()
+            self.__storage_client  = storage.Client()
 
     def create_dataset(self, datasetId: str):
         #
@@ -59,17 +63,22 @@ class BigqueryUtils:
         )
         return load_job.result()
 
-    def create_table_from_local_file(self, localFile, datasetId, tableId, writeDisposition='WRITE_TRUNCATE', fileType=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON):
+    def create_table_from_local_file(self, localFile, datasetId, tableId, writeDisposition='WRITE_TRUNCATE', fileType=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON, schema=None):
         datasetRef = self.__bigquery_client.dataset(datasetId)
         job_config = bigquery.LoadJobConfig()
         job_config.autodetect = True
         job_config.write_disposition = writeDisposition
         job_config.source_format = fileType
+        if schema and False:
+            tableSchema = []
+            for field in schema:
+                tableSchema.append(bigquery.schema.SchemaField.from_api_repr(field))
+            job_config.schema = tableSchema
         fileObj = open(localFile, 'rb')
         load_job = self.__bigquery_client.load_table_from_file(
             fileObj,
             datasetRef.table(tableId),
-            job_config=job_config
+            job_config=job_config,
         )
         fileObj.close()
         return load_job.result()

@@ -32,7 +32,7 @@ WITH
     insightsConfiguration.*,
     stats.*
   FROM
-    `Sportsight_Stats.all_stats` stats
+    `Sportsight_Stats.all_stats_baseball` stats
   LEFT JOIN
     insightsConfiguration
   ON

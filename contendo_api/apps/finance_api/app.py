@@ -17,7 +17,7 @@ from GetStockNews import GetStockNews
 app = Flask(__name__)
 
 def one_list_generator(listName, listConfigDict, startTime=dt.now()):
-    listsDefDict = ProUtils.get_dict_from_jsonfile('lists_config.json')
+    listsDefDict = ProUtils.get_dict_from_jsonfile('resource/lists_config.json')
     finquery = ProUtils.get_string_from_file('queries/top_lists_query.sql')
     #
     # read the query, configure and run it.
@@ -71,7 +71,7 @@ def one_list_generator(listName, listConfigDict, startTime=dt.now()):
     gsn = GetStockNews()
     for key, stockDict in listDict.items():
         stockDict['InterestingStatements'] = get_statements_for_ticker(stockDict['Symbol'], smc)
-        stockDict['RelevantNews'] = gsn.get_stocknews_byticker(stockDict['Symbol'])
+        stockDict['RelevantNews'] =     gsn.get_stocknews_byticker(stockDict['Symbol'])
 
     listDict['Description'] = listConfig['QuestionDescription']
     print(listDict, dt.now()-startTime )
@@ -97,7 +97,7 @@ def ticker_generator(ticker, startTime=dt.now()):
     if companiesDF.shape[0] == 0:
         raise NotFound('Ticker {} does not exists'.format(ticker))
 
-    stockDict = dict(companiesDF[['Symbol', 'Industry', 'Sector', 'Name', 'Exchange', 'LastClose', 'T52WeekLow', 'T52WeekHigh', 'MarketCapitalizationMln', 'PERatio']].iloc[0])
+    stockDict = dict(companiesDF[['Symbol', 'Industry', 'Sector', 'Name', 'Exchange', 'LastClose', 'T52WeekLow', 'T52WeekHigh', 'MarketCapitalizationMln', 'PERatio', 'CompanyLogoURL']].iloc[0])
     print(stockDict)
     #
     # get interestinf statements for the stock.
@@ -115,6 +115,25 @@ def ticker_generator(ticker, startTime=dt.now()):
 @app.route('/')
 def index():
   return 'Service contendo-finance-api is up and running!'
+
+@app.route('/finance/v1/update_docker')
+def update_docker():
+    startTime = dt.now()
+    #
+    # deploy the function to google cloud
+    imageName = 'gcr.io/sportsight-tests/finance_api'
+    serviceAccount = 'remote-user@sportsight-tests.iam.gserviceaccount.com'
+    buildCMD = 'gcloud builds submit --tag {image}'.format(image=imageName)
+    deployCMD = 'gcloud beta run deploy contendo-finance-api --image {image} --platform managed --memory=2Gi --timeout=15m --service-account={account}'.format(
+        image=imageName,
+        account=serviceAccount
+    )
+    print('Start building finance_api', buildCMD, dt.now() - startTime)
+    os.system(buildCMD)
+    print('Start deploying finance_api', deployCMD, dt.now() - startTime)
+    os.system(deployCMD)
+    print('Done deploying the function', dt.now() - startTime)
+    return 'Success!'
 
 
 @app.route('/finance/v1/get_ticker_data/<ticker>')
@@ -164,6 +183,6 @@ def get_top_lists(listname):
 
 if __name__ == "__main__":
     print(os.getcwd())
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'sportsight-tests.json'
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     app.run(debug=True,host='0.0.0.0',port=int(os.environ.get('PORT', 8080)))
     #app.run(port=int(os.environ.get('PORT', 8080)))

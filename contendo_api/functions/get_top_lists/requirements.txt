@@ -4,6 +4,9 @@ google-cloud-bigquery
 google-cloud-storage
 google-cloud-error-reporting
 pandas
-contendo_utils>=0.2.1
+contendo_utils>=0.2.4
 ta
 gcsfs
+statsmodels
+newspaper3k
+nltk

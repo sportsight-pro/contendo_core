@@ -16,6 +16,7 @@ class InsightsPackaging:
         #
         # read the questions
         query = ProUtils.format_string(self.questionsReaderQuery, configDef)
+        print(query)
         questionsDF = self.bqUtils.execute_query_to_df(query)
         #
         # find all metrics within slot
@@ -153,7 +154,7 @@ def test():
     print('Created insightsGenerator, delta time: {}'.format(dt.now()-startTime))
     for configCode in ig.icm.contentConfigDict.keys():
         #if configCode not in ['IMDB_Drama', 'IMDB_movies', 'IMDB_tvSeries', 'IMDB_tvMiniSeries', 'IMDB_All', ]:
-        if configCode.find('MLB_2019')==-1: # not in ['IMDB_History']:
+        if configCode.find('MLB_2019_Reg_pbp')==-1: # not in ['IMDB_History']:
             continue
         print('Starting: ' + configCode)
         nQuestions = ig.two_answers_generator(configCode)

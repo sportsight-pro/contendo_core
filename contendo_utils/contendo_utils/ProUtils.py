@@ -69,7 +69,6 @@ class ProUtils:
         jsonFile.close()
         return
 
-
     @staticmethod
     def create_path_directories(path):
         while not os.path.exists(Path(path).parent):

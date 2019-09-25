@@ -1,8 +1,11 @@
-from datetime import datetime as dt, timedelta
 import os
 import multiprocessing
-import time
 import pandas as pd
+import random
+import time
+from datetime import datetime as dt
+from datetime import timedelta
+
 from contendo_utils import BigqueryUtils
 from contendo_utils import ProUtils
 
@@ -26,8 +29,9 @@ definitions = {
         },
     },
 }
+definitions['PBPv2'] = definitions['PBP']
 targetDataset = 'Sportsight_Stats_v2'
-targetTableFormat = 'Stat_{SportCode}_{StatSource}_{StatName}_{StatObject}_{StatTimeframe}'
+targetTableFormat = 'Stat_{SportCode}_{StatTimeframe}_{StatSource}_{StatName}_{StatObject}'
 
 class SimpleStatsGenerator():
     #
@@ -37,7 +41,7 @@ class SimpleStatsGenerator():
         # get the initial configuration
         self.root = root
         self.configsheet_url = 'https://docs.google.com/spreadsheets/d/1gwtQlzk0iA4qyLzqaYEk5SggOqNZtJnSSfwnZYDNlAw/export?format=csv&gid={SheetId}&run=1'
-        sourceConfigDF = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,'284194018')).fillna('')
+        sourceConfigDF = pd.read_csv(self.configsheet_url.format(SheetId='284194018')).fillna('')
         sourceConfigDF['enriched'] = False
         self.sourcesConfigDict = ProUtils.pandas_df_to_dict(sourceConfigDF, 'Configname')
         self.sport_configs = {}
@@ -45,8 +49,8 @@ class SimpleStatsGenerator():
 
         #
         # read IMDB title definitions
-        titleTypesDF = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,'1802180540')).fillna('')
-        self.titletypesConfigDict = ProUtils.pandas_df_to_dict(titleTypesDF, 'TitleType')
+        #titleTypesDF = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,'1802180540')).fillna('')
+        #self.titletypesConfigDict = ProUtils.pandas_df_to_dict(titleTypesDF, 'TitleType')
 
         #print(sourceConfig)
 
@@ -63,7 +67,7 @@ class SimpleStatsGenerator():
         #
         # read all relevant metrics
         if sheetId not in self.sport_configs.keys():
-            self.sport_configs[sheetId] = pd.read_csv(self.configsheet_url.replace('{SheetId}' ,str(sourceConfig['SportSheetId']))).fillna('')
+            self.sport_configs[sheetId] = pd.read_csv(self.configsheet_url.format(SheetId = str(sourceConfig['SportSheetId']))).fillna('')
             self.sport_configs[sheetId]['SportCode'] = sourceConfig['SportCode']
 
         sourceConfig['StatsDefDict'] = ProUtils.pandas_df_to_dict(self.sport_configs[sheetId], 'StatName')
@@ -111,14 +115,14 @@ class SimpleStatsGenerator():
                                                                                        flush=True)
         #print('Consumer {} terminates, Deltatime: {}'.format(str(i), dt.now() - startTime), flush=True)
 
-    def queriesGenerator(self, queriesQueue, numExecutors, configurations=[]):
+    def queriesGenerator(self, queriesQueue, numExecutors, configurations=None, stats=None):
         startTime = dt.now()
         #
         # Make sure the target dataset exists
         self.bqUtils.create_dataset(targetDataset)
         #
         # if there are only partial list of configurations
-        if len(configurations) == 0 :
+        if not configurations:
             configurations = self.sourcesConfigDict.keys()
         #
         # loop over all configurations and generate
@@ -135,13 +139,13 @@ class SimpleStatsGenerator():
             # call the relevant generation function.
             print ("running configuration {}".format(sourceConfigName))
             generatorFunc = eval('self.{}'.format(sourceConfig['generatorFunc']))
-            generatorFunc(queriesQueue, sourceConfig, startTime)
+            generatorFunc(queriesQueue, sourceConfig, startTime, stats)
         #
         # Set the sentinel for all processes.
         for i in range(numExecutors):
             queriesQueue.put(self.sentinel)  # indicate sentinel
 
-    def financeQueriesGenerator(self, queriesQueue, sourceConfig, startTime):
+    def financeQueriesGenerator(self, queriesQueue, sourceConfig, startTime, stats=None):
         #
         # target table definitions
         financeTableFormat = 'Stat_Finance_{StatSource}_{StatName}_{StatObject}_Rolling_{RollingDays}'
@@ -186,7 +190,7 @@ class SimpleStatsGenerator():
                     }
                     queriesQueue.put(jobDefinition)
 
-    def imdbQueriesGenerator(self, queriesQueue, sourceConfig, startTime):
+    def imdbQueriesGenerator(self, queriesQueue, sourceConfig, startTime, stats=None):
 
         #
         # create jobs for all relevant metrics.
@@ -278,6 +282,12 @@ class SimpleStatsGenerator():
         questionsDF = pd.DataFrame(questionsList, columns=keys)
         questionsDF.to_csv('imdb_questionsList.csv')
 
+    def game_time(self):
+        instructions = {}
+        instructions['StatCondition'] = 'TRUE'
+        instructions['DaysRange'] = 'CAST(game.startTime as STRING)'
+        return instructions
+
     def days_range(self, interval, prev):
         instructions = {}
         startDate = (dt.today()-timedelta(days=interval+prev-1))
@@ -285,7 +295,7 @@ class SimpleStatsGenerator():
         condTemplate = '{DateProperty} BETWEEN "{StartDate}" and "{EndDate}"'
         condInst = {'StartDate': startDate.strftime('%Y%m%d'), 'EndDate': endDate.strftime('%Y%m%d')}
         instructions['StatCondition'] = ProUtils.format_string(condTemplate, condInst)
-        instructions['DaysRange'] = '{}...{}'.format(startDate.strftime('%Y-%m-%d'), endDate.strftime('%Y-%m-%d'))
+        instructions['DaysRange'] = '"{}...{}"'.format(startDate.strftime('%Y-%m-%d'), endDate.strftime('%Y-%m-%d'))
         return instructions
 
     def games_days_range(self, interval, prev):
@@ -295,10 +305,154 @@ class SimpleStatsGenerator():
         condTemplate = '{DateProperty} BETWEEN "{StartDate}" and "{EndDate}"'
         condInst = {'StartDate': startDate.strftime('%Y%m%d'), 'EndDate': endDate.strftime('%Y%m%d')}
         instructions['StatCondition'] = ProUtils.format_string(condTemplate, condInst)
-        instructions['DaysRange'] = 'N/A'
+        instructions['DaysRange'] = '"N/A"'
         return instructions
 
-    def sportsQueriesGenerator(self, queriesQueue, sourceConfig, startTime):
+    def mlbpbpQueriesGenerator(self, queriesQueue, sourceConfig, startTime, stats=None):
+        #
+        # create jobs for all relevant metrics.
+
+        #
+        # Get the dimentions and player/team map definitions.
+        dimentionsDF = pd.read_csv(self.configsheet_url.format(SheetId='550054182')).fillna('')
+        dimentionsDict = ProUtils.pandas_df_to_dict(dimentionsDF, 'ConditionCode')
+        ptmapDF = pd.read_csv(self.configsheet_url.format(SheetId='1185264127')).fillna('')
+        ptmapDict = ProUtils.pandas_df_to_dict(ptmapDF, 'Object')
+
+        for statDef in sourceConfig['StatsDefDict'].values():
+            if stats:
+                if statDef['StatName'] not in stats:
+                    continue
+            #
+            # only produce if the condition is defined.
+            if statDef['Condition']=='':
+                continue
+
+            if statDef['DoIT']!='y':
+                continue
+
+            sourceDefinitions = definitions[sourceConfig['StatSource']]
+            statTimeframe = sourceConfig['StatTimeframe']
+            for condCode, condDef in dimentionsDict.items():
+                for object, objectDef in ptmapDict.items():
+                    #
+                    # only do if defined as 1
+                    if condDef[object] != 1 or statDef[object]=='' or condDef['Condition']=='':
+                        continue
+
+                    statObject = objectDef['StatObject']
+
+                    query = sourceConfig['query']
+                    query = query.replace('{StatObject}', statObject)
+                    query = query.replace('{StatTimeframe}', statTimeframe)
+                    if sourceConfig['StatCondition'] != '':
+                        query = ProUtils.format_string(query, eval("self."+sourceConfig['StatCondition']))
+                    else:
+                        query = ProUtils.format_string(query, {'StatCondition': True})
+
+                    queryInst = {
+                        'DaysRange':        sourceConfig['DateProperty'],
+                        'PBPCondition':     '{} and {}'.format(condDef['Condition'], statDef['Condition']),
+                        'StatName':         'pbp.{}.{}.{}'.format(statDef['StatName'], object, condCode),
+                        'BaseStat':         statDef['StatName'],
+                        'ObjectType':       object,
+                        'ConditionCode':    condCode,
+                        'TeamType':         objectDef['TeamType'],
+                        'PlayerProperty':   statDef[object],
+                        #'PropertyName':     '{}{}{}'.format(objectDef['Prefix'], statDef[object], objectDef['Suffix']),
+                    }
+
+                    query = ProUtils.format_string(query, sourceDefinitions['StatObject'][statObject])
+                    query=ProUtils.format_string(query, queryInst)
+                    query=ProUtils.format_string(query, statDef)
+                    query=ProUtils.format_string(query, sourceConfig)
+                    #
+                    # define the destination table
+                    instructions = statDef.copy()
+                    instructions['StatName'] = queryInst['StatName']
+                    instructions['StatObject'] = statObject
+                    instructions['StatTimeframe'] = statTimeframe
+                    instructions['StatSource'] = sourceConfig['StatSource']
+                    instructions['DaysRange'] = instructions.get('DaysRange', 'N/A')
+                    targetTable = ProUtils.format_string(targetTableFormat, instructions).replace('.', '_')
+                    jobDefinition = {
+                        'params': {
+                            'query': query,
+                            'targetDataset': targetDataset,
+                            'targetTable': targetTable,
+                        },
+                        'StatName': queryInst['StatName'],
+                        'StatObject': statObject,
+                        'StatTimeframe': statTimeframe
+                    }
+                    queriesQueue.put(jobDefinition)
+
+    def mlbpbpQuestionsDefGenerator(self):
+        #
+        # create jobs for all relevant metrics.
+        questionsList=[]
+        sourceConfig = self.get_source_configuration('Baseball.PBPv2.Season')
+
+        #
+        # Get the dimentions and player/team map definitions.
+        dimentionsDF = pd.read_csv(self.configsheet_url.format(SheetId='550054182')).fillna('')
+        dimentionsDict = ProUtils.pandas_df_to_dict(dimentionsDF, 'ConditionCode')
+        ptmapDF = pd.read_csv(self.configsheet_url.format(SheetId='1185264127')).fillna('')
+        ptmapDict = ProUtils.pandas_df_to_dict(ptmapDF, 'Object')
+
+        for statDef in sourceConfig['StatsDefDict'].values():
+            #
+            # only produce if the condition is defined.
+            if statDef['Condition']=='':
+                continue
+
+            timeFrameTexts = sourceConfig['Timeframe'].split(',')
+
+            sourceDefinitions = definitions[sourceConfig['StatSource']]
+            statTimeframe = sourceConfig['StatTimeframe']
+            for condCode, condDef in dimentionsDict.items():
+                for object, objectDef in ptmapDict.items():
+                    #
+                    # only do if defined as 1
+                    if condDef[object] != 1 or statDef[object]=='' or condDef['Condition']=='':
+                        continue
+                    #
+                    # build the statname
+                    statName = 'pbp.{}.{}.{}'.format(statDef['StatName'], object, condCode)
+                    #
+                    # calculate the question string
+                    if statDef['Owner'] != objectDef['TeamType']:
+                        allowedText = statDef['AllowedText']
+                    else:
+                        allowedText = ''
+                    questionInst = {
+                        'Conditiontext': condDef['Conditiontext'],
+                        'ObjectType': objectDef['ObjectType'],
+                        'Allowed': allowedText,
+                        'Timeframe': timeFrameTexts[random.randint(0,len(timeFrameTexts)-1)],
+                    }
+                    question = ProUtils.format_string(statDef['Question2AnswersTemplate'], questionInst)
+                    while question.find('  ')  > -1:
+                        question = question.replace('  ', ' ')
+                    #
+                    # set the question definition.
+                    questionDef = {
+                        'QuestionCode': statName,
+                        'StatName': statName,
+                        'BaseStat': statDef['StatName'],
+                        'StatObject': objectDef['StatObject'],
+                        'Level': '',
+                        'Value1Template': 'INT',
+                        'Value2Template': 'INT',
+                        'Question2Objects': question,
+                    }
+                    questionsList.append(questionDef)
+
+        keys = questionDef.keys()
+        questionsDF = pd.DataFrame(questionsList, columns=keys)
+        questionsDF.to_csv('mlb-pbp-questionsList.csv')
+
+    def sportsQueriesGenerator(self, queriesQueue, sourceConfig, startTime, stats=None):
         #
         # create jobs for all relevant metrics.
         for statDef in sourceConfig['StatsDefDict'].values():
@@ -330,6 +484,7 @@ class SimpleStatsGenerator():
                     instructions['StatObject'] = statObject
                     instructions['StatTimeframe'] = statTimeframe
                     instructions['StatSource'] = sourceConfig['StatSource']
+                    instructions['DaysRange'] = instructions.get('DaysRange', 'N/A')
                     targetTable = ProUtils.format_string(targetTableFormat, instructions).replace('.', '_')
                     jobDefinition = {
                         'params': {
@@ -343,7 +498,7 @@ class SimpleStatsGenerator():
                     }
                     queriesQueue.put(jobDefinition)
 
-    def complexQueriesGenerator(self, queriesQueue, sourceConfig, startTime):
+    def complexQueriesGenerator(self, queriesQueue, sourceConfig, startTime, stats=None):
         #
         # create jobs for all relevant metrics.
         for statDef in sourceConfig['StatsDefDict'].values():
@@ -381,7 +536,7 @@ class SimpleStatsGenerator():
             }
             queriesQueue.put(jobDefinition)
 
-    def run(self, configurations=[], numExecutors=0):
+    def run(self, configurations=None, stats=None, numExecutors=0):
         #
         # main method
 
@@ -393,7 +548,11 @@ class SimpleStatsGenerator():
         producer = multiprocessing.Process(name='QueriesGenerator',
                                            target=self.queriesGenerator,
                                            args=(queriesQueue, numExecutors,),
-                                           kwargs={'configurations': configurations})
+                                           kwargs={
+                                               'configurations': configurations,
+                                               'stats': stats,
+                                           }
+                                           )
         producer.start()
         queriesQueue.join()
         #
@@ -415,14 +574,13 @@ class SimpleStatsGenerator():
 def test():
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     root = os.getcwd() #+ '/sportsight-core/Sportsight-insights'
-    os.chdir('../../')
+    os.chdir('{}/tmp/'.format(os.environ["HOME"]))
     generator = SimpleStatsGenerator(root)#'Baseball.PlayerSeasonStats')
     #generator.run()
-    #generator.run(configurations=['Baseball.PBP.Last7Days', 'Baseball.PBP.Last30Days', 'Baseball.PBP.Season'])
-    #generator.run(configurations=['Baseball.ComposedStats'], numExecutors=5)
     generator.run(configurations=['Finance.EOD'])
     #print(generator.days_range(30,1))
     #generator.imdbQuestionsDefGenerator()
 
 if __name__ == '__main__':
+    #print(globals())
     test()

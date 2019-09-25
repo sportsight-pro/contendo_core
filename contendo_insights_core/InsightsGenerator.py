@@ -38,7 +38,7 @@ class InsightsGenerator:
         return self.queryDict[queryKey]
 
     def get_twoquestions_dataset_and_table(self, contentConfigCode):
-        return 'temp', 'finance_questions_'+contentConfigCode
+        return 'temp', 'questions_'+contentConfigCode
 
     def get_lists_dataset_and_table(self, contentConfigCode):
         return 'temp', 'finance_lists_'+contentConfigCode
@@ -152,13 +152,13 @@ def test():
     # keys = ['MLB_2018_Reg_Merrifield']
     for configCode in keys:
         try:
-            configCode.index('Finance_')
+            configCode.index('MLB_2019_Reg_pbp')
         except:
             continue
         try:
             print('Starting: ' + configCode)
-            #nitems = ig.two_answers_generator(configCode)
-            nitems = ig.lists_generator(configCode)
+            nitems = ig.two_answers_generator(configCode)
+            #nitems = ig.lists_generator(configCode)
             print('Done, created {} items. delta time: {}'.format(nitems, dt.now() - startTime))
         except Exception as e:
             print("Error: {}".format(e))

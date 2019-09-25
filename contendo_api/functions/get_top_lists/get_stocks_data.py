@@ -30,6 +30,7 @@ class GetStocksData:
                 if not os.path.exists(self.resourceDir):
                     os.mkdir(self.resourceDir)
                 self.stocksDF.to_csv(self.stocksDataFileName)
+            self.stocksDF['Date1'] = self.stocksDF['Date'].astype(str)
                 #url = self.bqu.upload_file_to_gcp('sport-uploads', self.stocksDataFileName, self.stocksURL.replace('gs://sport-uploads/', ''))
 
         if len(stocklist)>0:
@@ -37,7 +38,7 @@ class GetStocksData:
         else:
             symbol_condition = ''
 
-        stocksQuery = '{symbol_condition} Date >= "{from_date}" and Date <= "{to_date}"'.format(symbol_condition=symbol_condition, from_date=from_date, to_date=to_date)
+        stocksQuery = '{symbol_condition} Date1 >= "{from_date}" and Date1 <= "{to_date}"'.format(symbol_condition=symbol_condition, from_date=from_date, to_date=to_date)
         stockDataDF = self.stocksDF.query(stocksQuery)
         stockDataDF.index = pd.to_datetime(stockDataDF['Date'])
         stockDataDF.rename_axis("date", axis='index', inplace=True)
@@ -48,7 +49,7 @@ class GetStocksData:
         from_date = to_date - datetime.timedelta(days=numdays-1)
         return self.get_stockdata_by_dates(stocklist, from_date, to_date)
 
-    def get_stock_fundamentals(self, stocklist=[], index=None):
+    def get_stock_fundamentals(self, stocklist=None, index=None, exchange=None):
         #
         # get updated company data
         if self.companiesDF is None:
@@ -62,10 +63,12 @@ class GetStocksData:
                 self.companiesDF.to_csv(self.companiesDataFileName)
                 #url = self.bqu.upload_file_to_gcp('sport-uploads', self.companiesDataFileName, self.companiesURL.replace('gs://sport-uploads/', ''))
 
-        if len(stocklist)>0:
+        if stocklist is not None:
             where_condition = 'Symbol in {tickersString}'.format(tickersString=str(stocklist))
         elif index in ['DJI', 'SNP']:
             where_condition = 'is{index}'.format(index=index)
+        elif exchange in ['NASDAQ', 'NYSE']:
+            where_condition = 'Exchange=="{exchange}"'.format(exchange=exchange)
         else:
             return self.companiesDF
 
@@ -77,7 +80,7 @@ if __name__ == '__main__':
     # Test
     startTime = dt.now()
     getstocks = GetStocksData()
-    companiesDF = getstocks.get_stock_fundamentals(index='SNP')
+    companiesDF = getstocks.get_stock_fundamentals(exchange='NYSE')
     #companiesDF = getstocks.get_stock_fundamentals(['MSFT', 'AAPL'])
     symbolList = list(companiesDF['Symbol'])
     print(symbolList, len(symbolList))

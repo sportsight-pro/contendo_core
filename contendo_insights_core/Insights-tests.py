@@ -13,7 +13,7 @@ def import_and_generate_stats():
     print('Done get_game_pbp(), delta time: {}'.format(dt.now() - startTime))
 
     si = SimpleStatsGenerator.SimpleStatsGenerator(root=root)
-    si.run()
+    #si.run()
     print('Done Stats-generation(), delta time: {}'.format(dt.now() - startTime))
 
 def questions_generation():
@@ -24,7 +24,7 @@ def questions_generation():
     #keys = ['MLB_2018_Reg_Merrifield']
     for configCode in keys:
         try:
-          configCode.index('MLB_')
+          configCode.index('2019')
         except:
             continue
         try:
@@ -40,7 +40,9 @@ def questions_generation():
 if __name__ == '__main__':
     startTime = dt.now()
     root = os.getcwd()  # + '/sportsight-core/Sportsight-insights'
+    print (root)
+    os.chdir('../../')
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
 
     import_and_generate_stats()
-    questions_generation()
+    #questions_generation()

@@ -11,7 +11,7 @@ FROM (
     '{LeagueCode}' AS LeagueCode,
     Season AS SeasonCode,
     'N/A' as CompetitionStageCode,
-    '{DaysRange}' as CompetitionDay,
+    {DaysRange} as CompetitionDay,
     CAST({GameCode} as STRING) AS GameCode,
     'N/A' as GamePeriodCode,
     CAST(team.id AS STRING) AS TeamCode,
@@ -19,7 +19,10 @@ FROM (
     '{StatName}' AS StatName,
     ROUND({StatFunction}(stats.{StatName}),2) AS StatValue,
     Countif(stats.{StatName}>0) as Count,
-    '{Description}' as Description
+    '{Description}' as Description,
+    'N/A' AS BaseStat,
+    'N/A' AS ConditionCode,
+    'N/A' AS ObjectType
   FROM
     `sportsight-tests.Baseball1.daily_{StatObject}_gamelogs_*`
   LEFT JOIN

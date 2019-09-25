@@ -11,7 +11,7 @@ class MsfImportMlb:
 
     def __init__(self):
         self.seasons = ['2019-regular', '2017-regular', '2017-playoff', '2018-regular', '2018-playoff']
-        #self.seasons = ['2019-regular']
+        self.seasons = ['2019-regular']
         apikey = '98de7b49-a696-4ed7-8efa-94b28a'
         self.msf = MySportsFeeds(version="2.0")
         self.msf.authenticate(apikey, "MYSPORTSFEEDS")
@@ -119,6 +119,40 @@ class MsfImportMlb:
     def get_game_pbp(self):
         start_time = dt.now()
         query='SELECT * FROM `sportsight-tests.Baseball1.missing_pbp_bydate`'
+        query="""
+            WITH
+              all_games AS (
+              SELECT
+                games.*,
+              IF
+                (gameid IS NULL,
+                  1,
+                  0) AS gameIsMissing
+              FROM
+                `sportsight-tests.Baseball1.games_view` games
+              LEFT JOIN (
+                SELECT
+                  gameid
+                FROM
+                  `sportsight-tests.Baseball1.all_pbp_new`) pbp
+              ON
+                games.id=pbp.gameid
+              WHERE
+                #gameid is null and
+                playedstatus='COMPLETED')
+            SELECT
+              season,
+              date,
+              max(gameIsMissing) as gameIsMissing,
+              ARRAY_AGG(STRUCT (id,
+                  matchname)) AS games
+            FROM
+              all_games
+            GROUP BY
+              season,
+              date
+            having gameIsMissing>0
+        """
         datesDF = self.bqu.execute_query_to_df(query)
         print(datesDF.shape)
         if (datesDF.shape[0]==0):
@@ -269,8 +303,8 @@ def test():
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "{}/sportsight-tests.json".format(os.environ["HOME"])
     mi = MsfImportMlb()
     #mi.get_seasonal_stats()
-    #mi.get_game_pbp()
-    mi.get_game_days_stats()
+    mi.get_game_pbp()
+    #mi.get_game_days_stats()
     print('Done')
 
 if __name__ == '__main__':

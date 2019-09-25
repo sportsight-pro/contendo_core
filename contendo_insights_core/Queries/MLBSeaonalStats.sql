@@ -19,7 +19,10 @@ FROM (
     '{StatName}' AS StatName,
     ROUND(stats.{StatName},2) AS StatValue,
     Count(1) as Count,
-    '{Description}' as Description
+    '{Description}' as Description,
+    'N/A' AS BaseStat,
+    'N/A' AS ConditionCode,
+    'N/A' AS ObjectType
   FROM
     `sportsight-tests.Baseball1.seasonal_{StatObject}_stats`
   LEFT JOIN

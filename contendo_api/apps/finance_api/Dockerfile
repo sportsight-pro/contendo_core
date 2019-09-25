@@ -1,16 +1,20 @@
 # Use the official Python image.
 # https://hub.docker.com/_/python
+#FROM google/cloud-sdk:latest
 FROM python:3.7-slim
 
 # Copy local code to the container image.
 ENV APP_HOME /app
 ENV PORT 8080
 ENV FLASK_APP=main.py
+ENV CONTENDO_ON_CLOUD=yes
 WORKDIR $APP_HOME
 COPY . ./
-
+#RUN gsutil cp gs://sport-uploads/Finance/companies.csv ./resource
+#RUN gsutil cp gs://sport-uploads/Finance/stocks.csv ./resource
 # Install production dependencies.
 RUN pip install -r requirements.txt
+RUN python update_data_files.py
 
 #expose 8080
 
