@@ -76,8 +76,11 @@ def test():
     for categoryName, category in trendsDict.items():
         filename = gtrend.get_trend_for_list(itemsDict['Rows'], 'Code', category, categoryName)
         datasetId = 'Trends_Data'
-        bqu.create_dataset(datasetId)
-        bqu.create_table_from_local_file(filename, datasetId, 'daily_trends', writeDisposition='WRITE_APPEND')
+        #bqu.create_dataset(datasetId)
+        try:
+            bqu.create_table_from_local_file(filename, datasetId, 'daily_trends', writeDisposition='WRITE_APPEND')
+        except Exception as e:
+            print (e)
     'Done'
 
 if __name__ == '__main__':
