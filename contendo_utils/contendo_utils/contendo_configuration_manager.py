@@ -40,6 +40,12 @@ class ContendoConfigurationManager:
 
         return _config_dict
 
+    def get_configuration_df(self, domain, gid):
+        assert (domain in self.domainsDict)
+        _config_df = self.get_configuration_pd(self.domainsDict[domain]['DocumentId'], gid)
+
+        return _config_df
+
     def get_domain_docid(self, domain):
         return self.domainsDict[domain]['DocumentId']
 
