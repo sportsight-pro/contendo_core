@@ -1,1 +1,0 @@
-All rights reserved to contendo.ai
